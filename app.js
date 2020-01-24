@@ -36,8 +36,8 @@ function post(url, data) {
 
 
 const dir = __dirname + "/static/"
-const port = 3030
-const local_port = 3333
+const port = process.env.GLOBAL_PORT
+const local_port = process.env.LOCAL_PORT
 const auth = process.env.AUTH_CODE
 const img_path = __dirname + "/data/img/"
 let manifest, lock
