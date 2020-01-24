@@ -8,3 +8,4 @@ AUTH_CODE=""        # passcode used for communications, can be anything
 GLOBAL_PORT=3030    # port used by server to communicate
 LOCAL_PORT=3333     # port used for local image display, this value does not control what is in `server-files/run.sh`
 ```
+3. make sure the timezone is set, default is UTC+0
