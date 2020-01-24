@@ -79,7 +79,7 @@ async function processManifest() {
         if (await exists(img_path + manifest.data[slide].hash + ".b64")) {
             console.log(manifest.data[slide].hash + " already saved")
         } else {
-            let data = await get(`http://${manifest.address}:3000/api/slide/get/${manifest.data[slide].id}`)
+            let data = await get(`http://${manifest.address}:${manifest.port}/api/slide/get/${manifest.data[slide].id}`)
             if (md5(data) == manifest.data[slide].hash) {
                 fs.writeFile(img_path + manifest.data[slide].hash + ".b64", data, (err) => {
                     if (err) console.log(err)
@@ -104,7 +104,7 @@ app.post("/manifest", async (req, res) => {
         await cleanImages()
         res.send({error: false})
     } else {
-        console.log("Auth failed for manifest update", req.body)
+        console.log("Auth failed for manifest update")
         res.send({error: "auth"})
     }
 });
@@ -117,9 +117,9 @@ internal_app.get("/image/:hash", (req, res) => res.sendFile(img_path + req.param
 
 async function checkForUpdate() {
     if (manifest.id != null) {
-        let serverNonce = await get(`http://${manifest.address}:3000/dapi/getnonce/${manifest.id}`)
+        let serverNonce = await get(`http://${manifest.address}:${manifest.port}/api/device/getnonce/${manifest.id}`)
         if (JSON.parse(serverNonce).nonce != manifest.nonce) {
-            get(`http://${manifest.address}:3000/dapi/refresh/${manifest.id}`);
+            get(`http://${manifest.address}:${manifest.port}/api/device/refresh/${manifest.id}`);
             console.log("Refreshing manifest");
         } else {
             console.log("Manifest up to date");
