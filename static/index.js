@@ -40,7 +40,9 @@ async function runLoop() {
         }
     }
     if (tmp_current == current) {
-        setTimeout(async ()=>(runLoop,0));
+        setTimeout(runLoop, 0);
+    } else {
+        console.log("Changed current, not restarting");
     }
 }
 

@@ -42,17 +42,6 @@ const auth = process.env.AUTH_CODE
 const img_path = __dirname + "/data/img/"
 let manifest, lock
 
-try {
-    manifest = JSON.parse(fs.readFileSync("data/manifest.json"))
-} catch(e) {
-    console.log("No manifest!")
-    manifest = {
-        "data": {},
-        "nonce": 0,
-        "id": null
-    }
-}
-lock = manifest.nonce
 
 function exists(path) {
     return new Promise(async (resolve, reject) => {
@@ -113,7 +102,10 @@ app.post("/manifest", async (req, res) => {
         console.log("Loaded new manifest");
         await processManifest()
         await cleanImages()
-        res.send({res: 0})
+        res.send({error: false})
+    } else {
+        console.log("Auth failed for manifest update", req.body)
+        res.send({error: "auth"})
     }
 });
 
@@ -139,9 +131,19 @@ async function checkForUpdate() {
 
 app.listen(port, () => console.log(`PieBord Client listening on port ${port}!`))
 internal_app.listen(local_port, 'localhost', async () => {
+    try {
+        manifest = JSON.parse(fs.readFileSync("data/manifest.json"))
+    } catch(e) {
+        console.log("No manifest!")
+        manifest = {
+            "data": {},
+            "nonce": 0,
+            "id": null
+        }
+    }
+    lock = manifest.nonce
     console.log(`PieBoard Local Client listening on port ${local_port}!`)
     await fs.promises.mkdir('data/img', { recursive: true })
     await checkForUpdate()
-    setInterval(checkForUpdate, 60*60*1000);
 });
 
