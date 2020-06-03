@@ -4,12 +4,15 @@ const fs = require('fs');
 const fetch = require('node-fetch')
 require('dotenv').config()
 
-const app = express()
-const internal_app = express()
+const srv_app = express()
+
+
+const { app, BrowserWindow, ipcMain } = require('electron')
+
 
 const bodyParser = require('body-parser')
-app.use(bodyParser.json({limit: '2gb', extended: true}))
-app.use(bodyParser.urlencoded({limit: '2gb', extended: true}))
+srv_app.use(bodyParser.json({limit: '2gb', extended: true}))
+srv_app.use(bodyParser.urlencoded({limit: '2gb', extended: true}))
 
 
 function get(url) {
@@ -36,9 +39,8 @@ function post(url, data) {
 
 
 const dir = __dirname + "/static/"
-const port = process.env.GLOBAL_PORT
-const local_port = process.env.LOCAL_PORT
-const auth = process.env.AUTH_CODE
+const port = process.env.GLOBAL_PORT || 3030
+const auth = process.env.AUTH_CODE || ""
 const img_path = __dirname + "/data/img/"
 let manifest, lock
 
@@ -91,11 +93,11 @@ async function processManifest() {
     fs.writeFileSync("data/manifest.json", JSON.stringify(manifest))
 }
 
-app.get('/manifest', (req, res) => {
+srv_app.get('/manifest', (req, res) => {
     res.send({"nonce": manifest.nonce})
 });
 
-app.post("/manifest", async (req, res) => {
+srv_app.post("/manifest", async (req, res) => {
     if (req.body.auth == auth) {
         manifest = req.body
         lock = manifest.nonce
@@ -109,11 +111,56 @@ app.post("/manifest", async (req, res) => {
     }
 });
 
-internal_app.get("/", (req, res) => res.sendFile(dir + "index.html"))
-internal_app.get("/ping", (req, res) => res.send({"nonce": lock}));
-internal_app.get("/manifest", (req, res) => res.send(manifest))
-internal_app.get("/index.js", (req, res) => res.sendFile(dir + "index.js"))
-internal_app.get("/image/:hash", (req, res) => res.sendFile(img_path + req.params.hash + ".b64"))
+
+function createWindow () {
+    let win = new BrowserWindow({
+      width: 1920,
+      height: 1080,
+      frame: false,
+      webPreferences: {
+        nodeIntegration: true
+      }
+    })
+
+    win.loadFile('static/index.html')
+}
+
+function getFileContent(path) {
+    return new Promise((resolve) => {
+        fs.readFile(path, "utf-8", (err, cont) => {
+            resolve(cont)
+        });
+    });
+}
+
+ipcMain.handle('ping', (event, arg) => {
+    return {"nonce": lock}
+})
+ipcMain.handle('manifest', (event, arg) => {
+    return manifest
+})
+ipcMain.handle('getImage', async (event, arg) => {
+    return await getFileContent(img_path + arg + ".b64")
+})
+
+app.whenReady().then(createWindow).then(async () => {
+    srv_app.listen(3030)
+    try {
+        manifest = JSON.parse(fs.readFileSync("data/manifest.json"))
+    } catch(e) {
+        console.log("No manifest!")
+        manifest = {
+            "data": {},
+            "nonce": 0,
+            "id": null
+        }
+    }
+    lock = manifest.nonce
+    await fs.promises.mkdir('data/img', { recursive: true })
+    await checkForUpdate()
+});
+
+
 
 async function checkForUpdate() {
     if (manifest.id != null) {
@@ -128,22 +175,4 @@ async function checkForUpdate() {
         console.log("No manifest ID loaded, cannot refresh");
     }
 }
-
-app.listen(port, () => console.log(`PieBord Client listening on port ${port}!`))
-internal_app.listen(local_port, 'localhost', async () => {
-    try {
-        manifest = JSON.parse(fs.readFileSync("data/manifest.json"))
-    } catch(e) {
-        console.log("No manifest!")
-        manifest = {
-            "data": {},
-            "nonce": 0,
-            "id": null
-        }
-    }
-    lock = manifest.nonce
-    console.log(`PieBoard Local Client listening on port ${local_port}!`)
-    await fs.promises.mkdir('data/img', { recursive: true })
-    await checkForUpdate()
-});
 
