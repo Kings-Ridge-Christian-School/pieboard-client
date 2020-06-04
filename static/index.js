@@ -5,20 +5,24 @@ const height = 1080
 const normalRatio = width/height
 let current = Math.random()
 
+const { ipcRenderer } = require('electron')
+
 function sleep(ms) {
     return new Promise((resolve) => {
         setTimeout(resolve, ms);
     });
 }
 
-function get(url) {
-    return new Promise(async (resolve) => {
-        let response = await fetch(url);
-        resolve(response.text());
+async function get(message, content) {
+    return new Promise((resolve) => {
+        ipcRenderer.invoke(message, content).then((result) => {
+            resolve(result)
+          })
     });
 }
 
 async function runLoop() {
+    warningCheck()
     let tmp_current = current
     let changes = 0;
     let delay = 0;
@@ -26,11 +30,10 @@ async function runLoop() {
         if (tmp_current == current) {
             if (new Date(manifest[frame].expiration) > new Date() || manifest[frame].expiration == 0) {
                 changes++
-                let data = await get(`/image/${manifest[frame].hash}`);
+                let data = (await get('getImage', manifest[frame].hash))
                 var i = new Image(); 
                 i.onload = async () => {
                     ratio = i.width/i.height
-                    console.log(ratio, normalRatio)
                     if (normalRatio <= ratio) {
                         img.style.width = "100%";
                         img.style.height = "auto";
@@ -38,9 +41,9 @@ async function runLoop() {
                         img.style.width = "auto";
                         img.style.height = "100%";
                     }
-                    document.getElementById("main").src = data
+                    document.getElementById("main").src =  data
                 }
-                i.src = data
+                i.src =  data
                 await sleep(manifest[frame].screentime*1000)
             }
         }
@@ -56,20 +59,38 @@ async function runLoop() {
         console.log("Changed current, not restarting");
     }
 }
+async function warningCheck() {
+    let warnings = await get('warnings')
+    let warner = document.getElementById("warning")
+    warner.innerHTML = ""
+    for (let warning of warnings) {
+        switch (warning) {
+            case "NOPASSWORD": 
+                warner.innerHTML += "<b>WARNING:</b> The default password is still set, anyone can change device configuration<br>";
+                break;
+            case "NOMANIFEST":
+                warner.innerHTML += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
+                break;
+            }
+    }
+}
 
 async function init() {
     current = Math.random()
-    manifest = JSON.parse(await get("/manifest"))
+    manifest = await get("manifest", 0)
+    if (manifest == "new manifest") {
+        manifest = {}
+    }
     nonce = manifest.nonce
     manifest = manifest.data
+    warningCheck();
     runLoop();
 }
 
 init();
 
 setInterval(async () => {
-    if (JSON.parse(await get("/ping")).nonce != nonce) {
-        console.log("new manifest");
+    if ((await get("ping", 0)).nonce != nonce) {
         init()
     }
 }, 1000);

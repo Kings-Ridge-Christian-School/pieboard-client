@@ -13,8 +13,17 @@ body {
     -webkit-transform: translate(-50%, -50%);
     transform: translate(-50%, -50%);
 }
+#warning {
+    color: red;
+}
 </style>
+<span id='warning'>
+    System initializing. If this message is on the screen for more than a few seconds, something is broken.
+</span>
 <div class='wrap'>
 <img id='main'>
 </div>
-<script src='index.js'></script>
+<script>
+console.log("Init")
+require('./index.js')
+</script>
