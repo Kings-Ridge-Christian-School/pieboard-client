@@ -142,7 +142,12 @@ ipcMain.handle('manifest', (event, arg) => {
 ipcMain.handle('getImage', async (event, arg) => {
     return await getFileContent(img_path + arg + ".b64")
 })
-
+ipcMain.handle('warnings', (event, arg) => {
+    let warnings = []
+    if (manifest.nonce == 0) warnings.push("NOMANIFEST")
+    if (auth == "") warnings.push("NOPASSWORD")
+    return warnings
+})
 app.whenReady().then(createWindow).then(async () => {
     srv_app.listen(3030)
     try {

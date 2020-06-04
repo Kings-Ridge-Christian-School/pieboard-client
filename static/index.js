@@ -22,6 +22,7 @@ async function get(message, content) {
 }
 
 async function runLoop() {
+    warningCheck()
     let tmp_current = current
     let changes = 0;
     let delay = 0;
@@ -58,6 +59,21 @@ async function runLoop() {
         console.log("Changed current, not restarting");
     }
 }
+async function warningCheck() {
+    let warnings = await get('warnings')
+    let warner = document.getElementById("warning")
+    warner.innerHTML = ""
+    for (let warning of warnings) {
+        switch (warning) {
+            case "NOPASSWORD": 
+                warner.innerHTML += "<b>WARNING:</b> The default password is still set, anyone can change device configuration<br>";
+                break;
+            case "NOMANIFEST":
+                warner.innerHTML += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
+                break;
+            }
+    }
+}
 
 async function init() {
     current = Math.random()
@@ -67,6 +83,7 @@ async function init() {
     }
     nonce = manifest.nonce
     manifest = manifest.data
+    warningCheck();
     runLoop();
 }
 
