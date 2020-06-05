@@ -43,7 +43,7 @@ const port = process.env.GLOBAL_PORT || 3030
 const auth = process.env.AUTH_CODE || ""
 const img_path = __dirname + "/data/img/"
 let manifest, lock
-
+let currentlyProcessing = 0
 
 function exists(path) {
     return new Promise(async (resolve, reject) => {
@@ -76,21 +76,39 @@ function cleanImages() {
         }
     });
 }
-async function processManifest() {
-    for (slide in manifest.data) {
-        if (await exists(img_path + manifest.data[slide].hash + ".b64")) {
-            console.log(manifest.data[slide].hash + " already saved")
+
+function slideDownload(slide, address, port) {
+    return new Promise(async (resolve) => {
+        let data = await get(`http://${address}:${port}/api/slide/get/${slide.id}`)
+        if (md5(data) == slide.hash) {
+            fs.writeFile(img_path + slide.hash + ".b64", data, (err) => {
+                if (err) console.log(err)
+                console.log("saved " + slide.hash)
+                currentlyProcessing--
+                resolve()
+            });
+        }
+    });
+}
+
+async function processManifest(newManifest) {
+    currentlyProcessing = 0
+    let slideLoads = []
+    for (slide in newManifest.data) {
+        if (await exists(img_path + newManifest.data[slide].hash + ".b64")) {
+            console.log(newManifest.data[slide].hash + " already saved")
         } else {
-            let data = await get(`http://${manifest.address}:${manifest.port}/api/slide/get/${manifest.data[slide].id}`)
-            if (md5(data) == manifest.data[slide].hash) {
-                fs.writeFile(img_path + manifest.data[slide].hash + ".b64", data, (err) => {
-                    if (err) console.log(err)
-                    console.log("saved " + manifest.data[slide].hash)
-                });
-            }
+            currentlyProcessing++
+            slideLoads.push(slideDownload(newManifest.data[slide], newManifest.address, newManifest.port));
         }
     }
+    let wait = await Promise.all(slideLoads)
     fs.writeFileSync("data/manifest.json", JSON.stringify(manifest))
+    manifest = newManifest
+    lock = manifest.nonce
+    await cleanImages()
+    console.log("Done processing manifest")
+    currentlyProcessing = false
 }
 
 srv_app.get('/manifest', (req, res) => {
@@ -99,11 +117,8 @@ srv_app.get('/manifest', (req, res) => {
 
 srv_app.post("/manifest", async (req, res) => {
     if (req.body.auth == auth) {
-        manifest = req.body
-        lock = manifest.nonce
-        console.log("Loaded new manifest");
-        await processManifest()
-        await cleanImages()
+        console.log("Loading new manifest");
+        await processManifest(req.body)
         res.send({error: false})
     } else {
         console.log("Auth failed for manifest update")
@@ -146,7 +161,12 @@ ipcMain.handle('warnings', (event, arg) => {
     let warnings = []
     if (manifest.nonce == 0) warnings.push("NOMANIFEST")
     if (auth == "") warnings.push("NOPASSWORD")
+    if (currentlyProcessing != 0) warnings.push("CPROSSING")
     return warnings
+})
+
+ipcMain.handle("currentlyProcessing", (event, arg) => {
+    return currentlyProcessing
 })
 app.whenReady().then(createWindow).then(async () => {
     srv_app.listen(3030)
