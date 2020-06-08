@@ -3,7 +3,7 @@ const md5 = require('md5');
 const fs = require('fs');
 const fetch = require('node-fetch')
 require('dotenv').config()
-
+const MAX_ACTIVE = process.env.MAX_ACTIVE || 10
 const srv_app = express()
 
 
@@ -76,15 +76,29 @@ function cleanImages() {
         }
     });
 }
+let wannaProcess = 0
+
+function availableSlot() {
+    return new Promise((resolve) => {
+        if (wannaProcess >= MAX_ACTIVE) {
+            setTimeout(() => resolve(availableSlot()), 1000)
+        } else {
+            resolve()
+        }
+    });
+}
 
 function slideDownload(slide, address, port) {
     return new Promise(async (resolve) => {
+        await availableSlot()
+        wannaProcess++
         let data = await get(`http://${address}:${port}/api/slide/get/${slide.id}`)
         if (md5(data) == slide.hash) {
             fs.writeFile(img_path + slide.hash + ".b64", data, (err) => {
                 if (err) console.log(err)
                 console.log("saved " + slide.hash)
                 currentlyProcessing--
+                wannaProcess-- // different from currentlyProcessing as currently is total and wanna is active
                 resolve()
             });
         }
@@ -108,7 +122,7 @@ async function processManifest(newManifest) {
     lock = manifest.nonce
     await cleanImages()
     console.log("Done processing manifest")
-    currentlyProcessing = false
+    currentlyProcessing = 0
 }
 
 srv_app.get('/manifest', (req, res) => {
