@@ -15,14 +15,27 @@ body {
 }
 #warning {
     color: red;
+    position: fixed;
+    left: 0;
+    top: 0;
+    text-align: left;
+}
+.updater {
+    color: white;
+    padding: 5px;
+    background-color: black;
+    margin: 5px;
+    border-radius: 3px;
+    border: 1px solid darkgray;
+    display: inline-block;
 }
 </style>
-<span id='warning'>
-    System initializing. If this message is on the screen for more than a few seconds, something is broken.
-</span>
 <div class='wrap'>
 <img id='main'>
 </div>
+<span id='warning'>
+    System initializing. If this message is on the screen for more than a few seconds, something is broken.
+</span>
 <script>
 console.log("Init")
 require('./index.js')

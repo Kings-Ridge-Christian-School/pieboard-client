@@ -19,6 +19,21 @@ function get(url) {
     return new Promise(async (resolve) => {
         let response = await fetch(url);
         resolve(response.text());
+        response = null
+    });
+}
+
+async function pipeToLocation(url, location) { 
+    const res = await fetch(url);
+    return new Promise((resolve, reject) => {
+      const fileStream = fs.createWriteStream(location);
+      res.body.pipe(fileStream);
+      res.body.on("error", (err) => {
+        reject(err);
+      });
+      fileStream.on("finish", function() {
+        resolve();
+      });
     });
 }
 
@@ -44,6 +59,7 @@ const auth = process.env.AUTH_CODE || ""
 const img_path = __dirname + "/data/img/"
 let manifest, lock
 let currentlyProcessing = 0
+let totalProcessing = 0
 
 function exists(path) {
     return new Promise(async (resolve, reject) => {
@@ -76,53 +92,33 @@ function cleanImages() {
         }
     });
 }
-let wannaProcess = 0
 
-function availableSlot() {
-    return new Promise((resolve) => {
-        if (wannaProcess >= MAX_ACTIVE) {
-            setTimeout(() => resolve(availableSlot()), 1000)
-        } else {
-            resolve()
-        }
-    });
-}
-
-function slideDownload(slide, address, port) {
-    return new Promise(async (resolve) => {
-        await availableSlot()
-        wannaProcess++
-        let data = await get(`http://${address}:${port}/api/slide/get/${slide.id}`)
-        if (md5(data) == slide.hash) {
-            fs.writeFile(img_path + slide.hash + ".b64", data, (err) => {
-                if (err) console.log(err)
-                console.log("saved " + slide.hash)
-                currentlyProcessing--
-                wannaProcess-- // different from currentlyProcessing as currently is total and wanna is active
-                resolve()
-            });
-        }
-    });
+async function slideDownload(slide, address, port) {
+     await pipeToLocation(`http://${address}:${port}/api/slide/get/${slide.id}`, img_path + slide.hash + ".b64")
+     currentlyProcessing--
+    console.log(`Saved ${slide.hash} (${(totalProcessing-currentlyProcessing)}/${totalProcessing})`)
 }
 
 async function processManifest(newManifest) {
-    currentlyProcessing = 0
+    currentlyProcessing = newManifest.data.length
+    totalProcessing = newManifest.data.length
+    console.log(`Checking ${currentlyProcessing} slides`)
     let slideLoads = []
     for (slide in newManifest.data) {
         if (await exists(img_path + newManifest.data[slide].hash + ".b64")) {
+            currentlyProcessing--
             console.log(newManifest.data[slide].hash + " already saved")
         } else {
-            currentlyProcessing++
-            slideLoads.push(slideDownload(newManifest.data[slide], newManifest.address, newManifest.port));
+            await slideDownload(newManifest.data[slide], newManifest.address, newManifest.port);
         }
     }
-    let wait = await Promise.all(slideLoads)
-    fs.writeFileSync("data/manifest.json", JSON.stringify(manifest))
+    fs.writeFileSync("data/manifest.json", JSON.stringify(newManifest))
     manifest = newManifest
     lock = manifest.nonce
     await cleanImages()
     console.log("Done processing manifest")
     currentlyProcessing = 0
+    totalProcessing = 0
 }
 
 srv_app.get('/manifest', (req, res) => {
@@ -175,12 +171,12 @@ ipcMain.handle('warnings', (event, arg) => {
     let warnings = []
     if (manifest.nonce == 0) warnings.push("NOMANIFEST")
     if (auth == "") warnings.push("NOPASSWORD")
-    if (currentlyProcessing != 0) warnings.push("CPROSSING")
+    if (currentlyProcessing != 0) warnings.push("CPROC")
     return warnings
 })
 
 ipcMain.handle("currentlyProcessing", (event, arg) => {
-    return currentlyProcessing
+    return [currentlyProcessing, totalProcessing]
 })
 app.whenReady().then(createWindow).then(async () => {
     srv_app.listen(3030)

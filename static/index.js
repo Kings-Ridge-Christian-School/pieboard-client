@@ -62,19 +62,22 @@ async function runLoop() {
 async function warningCheck() {
     let warnings = await get('warnings')
     let warner = document.getElementById("warning")
-    warner.innerHTML = ""
+    let addTo = ""
     for (let warning of warnings) {
         switch (warning) {
             case "NOPASSWORD": 
-                warner.innerHTML += "<b>WARNING:</b> The default password is still set, anyone can change device configuration<br>";
+                addTo += "<b>WARNING:</b> The default password is still set, anyone can change device configuration<br>";
                 break;
             case "NOMANIFEST":
-                warner.innerHTML += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
+                addTo += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
                 break;
-            case "CPROCESSING":
-                warning.innerHTML += `<b>WARNING: </b> Currently processing ${await get("currentlyProcessing")} files`
+            case "CPROC":
+                let totals = await get("currentlyProcessing")
+                addTo += `<span color='white' class='updater'>${totals[1]-totals[0]} of ${totals[1]} slides added</span>`
+                break;
         }
     }
+    warner.innerHTML = addTo
 }
 
 async function init() {
@@ -85,13 +88,13 @@ async function init() {
     }
     nonce = manifest.nonce
     manifest = manifest.data
-    warningCheck();
     runLoop();
 }
 
 init();
 
 setInterval(async () => {
+    warningCheck()
     if ((await get("ping", 0)).nonce != nonce) {
         init()
     }
