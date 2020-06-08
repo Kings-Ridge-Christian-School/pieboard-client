@@ -106,6 +106,7 @@ async function processManifest(newManifest) {
     let slideLoads = []
     for (slide in newManifest.data) {
         if (await exists(img_path + newManifest.data[slide].hash + ".b64")) {
+            currentlyProcessing--
             console.log(newManifest.data[slide].hash + " already saved")
         } else {
             await slideDownload(newManifest.data[slide], newManifest.address, newManifest.port);
