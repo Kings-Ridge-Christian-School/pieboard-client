@@ -19,6 +19,21 @@ function get(url) {
     return new Promise(async (resolve) => {
         let response = await fetch(url);
         resolve(response.text());
+        response = null
+    });
+}
+
+async function pipeToLocation(url, location) { 
+    const res = await fetch(url);
+    return new Promise((resolve, reject) => {
+      const fileStream = fs.createWriteStream(location);
+      res.body.pipe(fileStream);
+      res.body.on("error", (err) => {
+        reject(err);
+      });
+      fileStream.on("finish", function() {
+        resolve();
+      });
     });
 }
 
@@ -44,6 +59,7 @@ const auth = process.env.AUTH_CODE || ""
 const img_path = __dirname + "/data/img/"
 let manifest, lock
 let currentlyProcessing = 0
+let totalProcessing = 0
 
 function exists(path) {
     return new Promise(async (resolve, reject) => {
@@ -77,24 +93,15 @@ function cleanImages() {
     });
 }
 
-function slideDownload(slide, address, port) {
-    return new Promise(async (resolve) => {
-        let data = await get(`http://${address}:${port}/api/slide/get/${slide.id}`)
-        if (md5(data) == slide.hash) {
-            fs.writeFile(img_path + slide.hash + ".b64", data, (err) => {
-                if (err) console.log(err)
-                console.log(`Saved ${slide.hash}`)
-                data = null
-                resolve()
-            });
-        } else {
-            console.log(`Integrity check for ${slide.hash} does not match up!`);
-        }
-    });
+async function slideDownload(slide, address, port) {
+     await pipeToLocation(`http://${address}:${port}/api/slide/get/${slide.id}`, img_path + slide.hash + ".b64")
+     currentlyProcessing--
+    console.log(`Saved ${slide.hash} (${(totalProcessing-currentlyProcessing)}/${totalProcessing})`)
 }
 
 async function processManifest(newManifest) {
     currentlyProcessing = newManifest.data.length
+    totalProcessing = newManifest.data.length
     console.log(`Checking ${currentlyProcessing} slides`)
     let slideLoads = []
     for (slide in newManifest.data) {
@@ -102,7 +109,6 @@ async function processManifest(newManifest) {
             console.log(newManifest.data[slide].hash + " already saved")
         } else {
             await slideDownload(newManifest.data[slide], newManifest.address, newManifest.port);
-            currentlyProcessing--
         }
     }
     fs.writeFileSync("data/manifest.json", JSON.stringify(newManifest))
@@ -111,6 +117,7 @@ async function processManifest(newManifest) {
     await cleanImages()
     console.log("Done processing manifest")
     currentlyProcessing = 0
+    totalProcessing = 0
 }
 
 srv_app.get('/manifest', (req, res) => {
@@ -131,9 +138,9 @@ srv_app.post("/manifest", async (req, res) => {
 
 function createWindow () {
     let win = new BrowserWindow({
-      //width: 1920,
-      //height: 1080,
-      //frame: false,
+      width: 1920,
+      height: 1080,
+      frame: false,
       webPreferences: {
         nodeIntegration: true
       }
@@ -168,7 +175,7 @@ ipcMain.handle('warnings', (event, arg) => {
 })
 
 ipcMain.handle("currentlyProcessing", (event, arg) => {
-    return currentlyProcessing
+    return [currentlyProcessing, totalProcessing]
 })
 app.whenReady().then(createWindow).then(async () => {
     srv_app.listen(3030)

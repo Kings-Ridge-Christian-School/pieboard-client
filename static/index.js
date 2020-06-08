@@ -72,7 +72,8 @@ async function warningCheck() {
                 warner.innerHTML += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
                 break;
             case "CPROC":
-                warner.innerHTML += `<b>WARNING: </b> Currently processing ${await get("currentlyProcessing")} files`
+                let totals = await get("currentlyProcessing")
+                warner.innerHTML += `<b>WARNING: </b> ${totals[1]-totals[0]} of ${totals[1]} files processed`
                 break;
         }
     }
