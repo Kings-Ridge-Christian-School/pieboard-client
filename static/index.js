@@ -71,8 +71,9 @@ async function warningCheck() {
             case "NOMANIFEST":
                 warner.innerHTML += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
                 break;
-            case "CPROCESSING":
-                warning.innerHTML += `<b>WARNING: </b> Currently processing ${await get("currentlyProcessing")} files`
+            case "CPROC":
+                warner.innerHTML += `<b>WARNING: </b> Currently processing ${await get("currentlyProcessing")} files`
+                break;
         }
     }
 }
@@ -85,13 +86,13 @@ async function init() {
     }
     nonce = manifest.nonce
     manifest = manifest.data
-    warningCheck();
     runLoop();
 }
 
 init();
 
 setInterval(async () => {
+    warningCheck()
     if ((await get("ping", 0)).nonce != nonce) {
         init()
     }

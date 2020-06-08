@@ -76,48 +76,36 @@ function cleanImages() {
         }
     });
 }
-let wannaProcess = 0
-
-function availableSlot() {
-    return new Promise((resolve) => {
-        if (wannaProcess >= MAX_ACTIVE) {
-            setTimeout(() => resolve(availableSlot()), 1000)
-        } else {
-            resolve()
-        }
-    });
-}
 
 function slideDownload(slide, address, port) {
     return new Promise(async (resolve) => {
-        await availableSlot()
-        wannaProcess++
         let data = await get(`http://${address}:${port}/api/slide/get/${slide.id}`)
         if (md5(data) == slide.hash) {
             fs.writeFile(img_path + slide.hash + ".b64", data, (err) => {
                 if (err) console.log(err)
-                console.log("saved " + slide.hash)
-                currentlyProcessing--
-                wannaProcess-- // different from currentlyProcessing as currently is total and wanna is active
+                console.log(`Saved ${slide.hash}`)
+                data = null
                 resolve()
             });
+        } else {
+            console.log(`Integrity check for ${slide.hash} does not match up!`);
         }
     });
 }
 
 async function processManifest(newManifest) {
-    currentlyProcessing = 0
+    currentlyProcessing = newManifest.data.length
+    console.log(`Checking ${currentlyProcessing} slides`)
     let slideLoads = []
     for (slide in newManifest.data) {
         if (await exists(img_path + newManifest.data[slide].hash + ".b64")) {
             console.log(newManifest.data[slide].hash + " already saved")
         } else {
-            currentlyProcessing++
-            slideLoads.push(slideDownload(newManifest.data[slide], newManifest.address, newManifest.port));
+            await slideDownload(newManifest.data[slide], newManifest.address, newManifest.port);
+            currentlyProcessing--
         }
     }
-    let wait = await Promise.all(slideLoads)
-    fs.writeFileSync("data/manifest.json", JSON.stringify(manifest))
+    fs.writeFileSync("data/manifest.json", JSON.stringify(newManifest))
     manifest = newManifest
     lock = manifest.nonce
     await cleanImages()
@@ -143,9 +131,9 @@ srv_app.post("/manifest", async (req, res) => {
 
 function createWindow () {
     let win = new BrowserWindow({
-      width: 1920,
-      height: 1080,
-      frame: false,
+      //width: 1920,
+      //height: 1080,
+      //frame: false,
       webPreferences: {
         nodeIntegration: true
       }
@@ -175,7 +163,7 @@ ipcMain.handle('warnings', (event, arg) => {
     let warnings = []
     if (manifest.nonce == 0) warnings.push("NOMANIFEST")
     if (auth == "") warnings.push("NOPASSWORD")
-    if (currentlyProcessing != 0) warnings.push("CPROSSING")
+    if (currentlyProcessing != 0) warnings.push("CPROC")
     return warnings
 })
 
