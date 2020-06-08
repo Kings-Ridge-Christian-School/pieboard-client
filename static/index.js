@@ -62,21 +62,22 @@ async function runLoop() {
 async function warningCheck() {
     let warnings = await get('warnings')
     let warner = document.getElementById("warning")
-    warner.innerHTML = ""
+    let addTo = ""
     for (let warning of warnings) {
         switch (warning) {
             case "NOPASSWORD": 
-                warner.innerHTML += "<b>WARNING:</b> The default password is still set, anyone can change device configuration<br>";
+                addTo += "<b>WARNING:</b> The default password is still set, anyone can change device configuration<br>";
                 break;
             case "NOMANIFEST":
-                warner.innerHTML += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
+                addTo += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
                 break;
             case "CPROC":
                 let totals = await get("currentlyProcessing")
-                warner.innerHTML += `<b>WARNING: </b> ${totals[1]-totals[0]} of ${totals[1]} files processed`
+                addTo += `<span color='white' class='updater'>${totals[1]-totals[0]} of ${totals[1]} slides added</span>`
                 break;
         }
     }
+    warner.innerHTML = addTo
 }
 
 async function init() {
