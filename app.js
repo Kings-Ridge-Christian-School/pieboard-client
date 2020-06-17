@@ -5,7 +5,7 @@ const fetch = require('node-fetch')
 require('dotenv').config()
 const MAX_ACTIVE = process.env.MAX_ACTIVE || 10
 const srv_app = express()
-
+const NOSLIDE_WARNING = process.env.NOSLIDE_WARNING || true
 
 const { app, BrowserWindow, ipcMain } = require('electron')
 
@@ -172,6 +172,7 @@ ipcMain.handle('warnings', (event, arg) => {
     if (manifest.nonce == 0) warnings.push("NOMANIFEST")
     if (auth == "") warnings.push("NOPASSWORD")
     if (currentlyProcessing != 0) warnings.push("CPROC")
+    if (manifest.data.length == 0 && NOSLIDE_WARNING) warnings.push("NOSLIDE")
     return warnings
 })
 

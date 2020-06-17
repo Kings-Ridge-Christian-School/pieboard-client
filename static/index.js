@@ -75,6 +75,9 @@ async function warningCheck() {
                 let totals = await get("currentlyProcessing")
                 addTo += `<span color='white' class='updater'>${totals[1]-totals[0]} of ${totals[1]} slides added</span>`
                 break;
+            case "NOSLIDES":
+                addTo += "<b>WARNING:</b> This device has no slides to show"
+                break;
         }
     }
     warner.innerHTML = addTo
