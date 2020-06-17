@@ -69,7 +69,13 @@ async function warningCheck() {
                 addTo += "<b>WARNING:</b> The default password is still set, anyone can change device configuration<br>";
                 break;
             case "NOMANIFEST":
-                addTo += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br>"
+                addTo += "<b>WARNING:</b> No manifest is loaded. Please add this device to a server.<br> <b>Possible network addresses:</b><br><table><tr><td>Name</td><td>IP</td><td>MAC Address</td></tr></tr>"
+                let interfaces = await get("interfaces")
+                for (let interface of interfaces) {
+                    console.log(interface);
+                    addTo += `<tr><td>${interface.name}</td><td>${interface.address}</td><td>${interface.mac}</td></tr>`
+                }
+                addTo += "</table>"
                 break;
             case "CPROC":
                 let totals = await get("currentlyProcessing")

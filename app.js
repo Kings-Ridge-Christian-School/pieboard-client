@@ -2,6 +2,7 @@ const express = require('express')
 const md5 = require('md5');
 const fs = require('fs');
 const fetch = require('node-fetch')
+const os = require('os')
 require('dotenv').config()
 const MAX_ACTIVE = process.env.MAX_ACTIVE || 10
 const srv_app = express()
@@ -93,6 +94,19 @@ function cleanImages() {
     });
 }
 
+function getInterfaces() {
+    var ifaces = os.networkInterfaces();
+    let names = []
+    for (iface in ifaces) {
+        for (alias of ifaces[iface]) {
+            if (alias.internal == false) {
+                names.push({"name": iface, "address": alias.address, "mac": alias.mac})
+            }
+        }
+    }
+    return names
+}
+
 async function slideDownload(slide, address, port) {
      await pipeToLocation(`http://${address}:${port}/api/slide/get/${slide.id}`, img_path + slide.hash + ".b64")
      currentlyProcessing--
@@ -179,6 +193,11 @@ ipcMain.handle('warnings', (event, arg) => {
 ipcMain.handle("currentlyProcessing", (event, arg) => {
     return [currentlyProcessing, totalProcessing]
 })
+
+ipcMain.handle("interfaces", (event, arg) => {
+    return getInterfaces()
+});
+
 app.whenReady().then(createWindow).then(async () => {
     srv_app.listen(3030)
     try {
