@@ -138,10 +138,21 @@ async function processManifest(newManifest) {
 }
 
 srv_app.get('/manifest', (req, res) => {
-    res.send({
+    res.send({"nonce": manifest.nonce})
+});
+
+srv_app.get("/status", (req, res) => {
+    if (req.query.auth == auth) {
+        res.send({
+            "error": false,
             "nonce": manifest.nonce,
-            "image": lastImage
+            "image": lastImage,
+            "warns": getWarnings()
         })
+    } else {
+        console.log("Auth failed for status update")
+        res.send({error: "auth"})
+    }
 });
 
 srv_app.post("/manifest", async (req, res) => {
@@ -185,6 +196,15 @@ function getFileContent(path) {
     });
 }
 
+function getWarnings() {
+    let warnings = []
+    if (manifest.nonce == 0) warnings.push("NOMANIFEST")
+    if (auth == "") warnings.push("NOPASSWORD")
+    if (currentlyProcessing != 0) warnings.push("CPROC")
+    if (manifest.data.length == 0 && NOSLIDE_WARNING) warnings.push("NOSLIDE")
+    return warnings
+}
+
 ipcMain.handle('ping', (event, arg) => {
     return {"nonce": lock}
 })
@@ -196,12 +216,7 @@ ipcMain.handle('getImage', async (event, arg) => {
     return await getFileContent(img_path + arg + ".b64")
 })
 ipcMain.handle('warnings', (event, arg) => {
-    let warnings = []
-    if (manifest.nonce == 0) warnings.push("NOMANIFEST")
-    if (auth == "") warnings.push("NOPASSWORD")
-    if (currentlyProcessing != 0) warnings.push("CPROC")
-    if (manifest.data.length == 0 && NOSLIDE_WARNING) warnings.push("NOSLIDE")
-    return warnings
+    return getWarnings()
 })
 
 ipcMain.handle("currentlyProcessing", (event, arg) => {
