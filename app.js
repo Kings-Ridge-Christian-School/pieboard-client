@@ -4,6 +4,7 @@ const fs = require('fs');
 const fetch = require('node-fetch')
 const os = require('os')
 require('dotenv').config()
+const exec = require('child_process').exec;
 const MAX_ACTIVE = process.env.MAX_ACTIVE || 10
 const srv_app = express()
 const NOSLIDE_WARNING = process.env.NOSLIDE_WARNING || true
@@ -61,6 +62,7 @@ const img_path = __dirname + "/data/img/"
 let manifest, lock
 let currentlyProcessing = 0
 let totalProcessing = 0
+let lastImage = ""
 
 function exists(path) {
     return new Promise(async (resolve, reject) => {
@@ -136,7 +138,10 @@ async function processManifest(newManifest) {
 }
 
 srv_app.get('/manifest', (req, res) => {
-    res.send({"nonce": manifest.nonce})
+    res.send({
+            "nonce": manifest.nonce,
+            "image": lastImage
+        })
 });
 
 srv_app.post("/manifest", async (req, res) => {
@@ -150,6 +155,14 @@ srv_app.post("/manifest", async (req, res) => {
     }
 });
 
+srv_app.post("/reboot", (req, res) => {
+    if (req.body.auth == auth) {
+        exec('shutdown -r now', function(error, stdout, stderr){ res.send({error: false}) });
+    } else {
+        console.log("Auth failed for reboot request")
+        res.send({error: "auth"})
+    }
+});
 
 function createWindow () {
     let win = new BrowserWindow({
@@ -179,6 +192,7 @@ ipcMain.handle('manifest', (event, arg) => {
     return manifest
 })
 ipcMain.handle('getImage', async (event, arg) => {
+    lastImage = arg
     return await getFileContent(img_path + arg + ".b64")
 })
 ipcMain.handle('warnings', (event, arg) => {
