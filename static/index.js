@@ -41,7 +41,7 @@ async function runLoop() {
                         img.style.width = "auto";
                         img.style.height = "100%";
                     }
-                    document.getElementById("main").src =  data
+                    img.src =  data
                 }
                 i.src =  data
                 await sleep(manifest[frame].screentime*1000)

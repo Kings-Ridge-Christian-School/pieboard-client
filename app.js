@@ -4,6 +4,7 @@ const fs = require('fs');
 const fetch = require('node-fetch')
 const os = require('os')
 require('dotenv').config()
+const exec = require('child_process').exec;
 const MAX_ACTIVE = process.env.MAX_ACTIVE || 10
 const srv_app = express()
 const NOSLIDE_WARNING = process.env.NOSLIDE_WARNING || true
@@ -61,6 +62,7 @@ const img_path = __dirname + "/data/img/"
 let manifest, lock
 let currentlyProcessing = 0
 let totalProcessing = 0
+let lastImage = ""
 
 function exists(path) {
     return new Promise(async (resolve, reject) => {
@@ -139,6 +141,20 @@ srv_app.get('/manifest', (req, res) => {
     res.send({"nonce": manifest.nonce})
 });
 
+srv_app.get("/status", (req, res) => {
+    if (req.query.auth == auth) {
+        res.send({
+            "error": false,
+            "nonce": manifest.nonce,
+            "image": lastImage,
+            "warns": getWarnings()
+        })
+    } else {
+        console.log("Auth failed for status update")
+        res.send({error: "auth"})
+    }
+});
+
 srv_app.post("/manifest", async (req, res) => {
     if (req.body.auth == auth) {
         console.log("Loading new manifest");
@@ -150,6 +166,14 @@ srv_app.post("/manifest", async (req, res) => {
     }
 });
 
+srv_app.post("/reboot", (req, res) => {
+    if (req.body.auth == auth) {
+        exec('shutdown -r now', function(error, stdout, stderr){ res.send({error: false}) });
+    } else {
+        console.log("Auth failed for reboot request")
+        res.send({error: "auth"})
+    }
+});
 
 function createWindow () {
     let win = new BrowserWindow({
@@ -172,6 +196,15 @@ function getFileContent(path) {
     });
 }
 
+function getWarnings() {
+    let warnings = []
+    if (manifest.nonce == 0) warnings.push("NOMANIFEST")
+    if (auth == "") warnings.push("NOPASSWORD")
+    if (currentlyProcessing != 0) warnings.push("CPROC")
+    if (manifest.data.length == 0 && NOSLIDE_WARNING) warnings.push("NOSLIDE")
+    return warnings
+}
+
 ipcMain.handle('ping', (event, arg) => {
     return {"nonce": lock}
 })
@@ -179,15 +212,11 @@ ipcMain.handle('manifest', (event, arg) => {
     return manifest
 })
 ipcMain.handle('getImage', async (event, arg) => {
+    lastImage = arg
     return await getFileContent(img_path + arg + ".b64")
 })
 ipcMain.handle('warnings', (event, arg) => {
-    let warnings = []
-    if (manifest.nonce == 0) warnings.push("NOMANIFEST")
-    if (auth == "") warnings.push("NOPASSWORD")
-    if (currentlyProcessing != 0) warnings.push("CPROC")
-    if (manifest.data.length == 0 && NOSLIDE_WARNING) warnings.push("NOSLIDE")
-    return warnings
+    return getWarnings()
 })
 
 ipcMain.handle("currentlyProcessing", (event, arg) => {
