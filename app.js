@@ -143,6 +143,7 @@ srv_app.get('/manifest', (req, res) => {
 
 srv_app.get("/status", (req, res) => {
     if (req.query.auth == auth) {
+        saveNewIP(req.connection.localAddress)
         res.send({
             "error": false,
             "nonce": manifest.nonce,
@@ -158,7 +159,8 @@ srv_app.get("/status", (req, res) => {
 srv_app.post("/manifest", async (req, res) => {
     if (req.body.auth == auth) {
         console.log("Loading new manifest");
-        await processManifest(req.body)
+        saveNewIP(req.connection.localAddress)
+        await processManifest(req.body);
         res.send({error: false})
     } else {
         console.log("Auth failed for manifest update")
@@ -168,6 +170,8 @@ srv_app.post("/manifest", async (req, res) => {
 
 srv_app.post("/reboot", (req, res) => {
     if (req.body.auth == auth) {
+        saveNewIP(req.connection.localAddress)
+        res.send({error: false})
         exec('shutdown -r now', function(error, stdout, stderr){ res.send({error: false}) });
     } else {
         console.log("Auth failed for reboot request")
@@ -196,12 +200,31 @@ function getFileContent(path) {
     });
 }
 
-function getWarnings() {
+async function ipChangeDetection() {
+    let ret = true
+    if (await exists('data/connect_ip')) {
+        let ip = await getFileContent('data/connect_ip')
+        for (let interface of getInterfaces()) {
+            if (interface.address == ip.trim()) ret = false
+        }
+        return ret
+    } else return true
+}
+
+function saveNewIP(ip) {
+    ip = ip.replace("::ffff:", "")
+    fs.writeFile("data/connect_ip", ip, async (err) => {
+        if (err) console.log(err)
+    });
+}
+
+async function getWarnings() {
     let warnings = []
     if (manifest.nonce == 0) warnings.push("NOMANIFEST")
     if (auth == "") warnings.push("NOPASSWORD")
     if (currentlyProcessing != 0) warnings.push("CPROC")
     if (manifest.data.length == 0 && NOSLIDE_WARNING) warnings.push("NOSLIDE")
+    if (await ipChangeDetection() && manifest.nonce != 0) warnings.push("IPERROR")
     return warnings
 }
 
