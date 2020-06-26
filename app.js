@@ -141,14 +141,14 @@ srv_app.get('/manifest', (req, res) => {
     res.send({"nonce": manifest.nonce})
 });
 
-srv_app.get("/status", (req, res) => {
+srv_app.get("/status", async (req, res) => {
     if (req.query.auth == auth) {
         saveNewIP(req.connection.localAddress)
         res.send({
             "error": false,
             "nonce": manifest.nonce,
             "image": lastImage,
-            "warns": getWarnings()
+            "warns": await getWarnings()
         })
     } else {
         console.log("Auth failed for status update")
