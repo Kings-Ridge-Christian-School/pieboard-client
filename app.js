@@ -83,11 +83,11 @@ function delFile(path) {
 }
 function cleanImages() {
     let tmp_hash = []
-    for (image in manifest.data) {
-        tmp_hash.push(manifest.data[image].hash + ".b64")
+    for (image of manifest.data) {
+        tmp_hash.push(`${image.hash}.${image.extension}`)
     }
     fs.readdir(img_path, async (err, files) => {
-        for (file in files) {
+        for (let file in files) {
             if (!tmp_hash.includes(files[file])) {
                 await delFile(img_path + files[file])
                 console.log(`Deleted ${files[file]}`)
@@ -110,7 +110,7 @@ function getInterfaces() {
 }
 
 async function slideDownload(slide, address, port) {
-     await pipeToLocation(`http://${address}:${port}/api/slide/get/${slide.id}`, img_path + slide.hash + ".b64")
+     await pipeToLocation(`http://${address}:${port}/api/slide/get/${slide.hash}.${slide.extension}`, img_path + `${slide.hash}.${slide.extension}`)
      currentlyProcessing--
     console.log(`Saved ${slide.hash} (${(totalProcessing-currentlyProcessing)}/${totalProcessing})`)
 }
@@ -119,13 +119,12 @@ async function processManifest(newManifest) {
     currentlyProcessing = newManifest.data.length
     totalProcessing = newManifest.data.length
     console.log(`Checking ${currentlyProcessing} slides`)
-    let slideLoads = []
-    for (slide in newManifest.data) {
-        if (await exists(img_path + newManifest.data[slide].hash + ".b64")) {
+    for (slide of newManifest.data) {
+        if (await exists(`${img_path}${slide.hash}.${slide.extension}`)) {
             currentlyProcessing--
-            console.log(newManifest.data[slide].hash + " already saved")
+            console.log(`${slide.hash}.${slide.extension} already saved`)
         } else {
-            await slideDownload(newManifest.data[slide], newManifest.address, newManifest.port);
+            await slideDownload(slide, newManifest.address, newManifest.port);
         }
     }
     fs.writeFileSync("data/manifest.json", JSON.stringify(newManifest))
@@ -236,7 +235,7 @@ ipcMain.handle('manifest', (event, arg) => {
 })
 ipcMain.handle('getImage', async (event, arg) => {
     lastImage = arg
-    return await getFileContent(img_path + arg + ".b64")
+    return await getFileContent(img_path + arg)
 })
 ipcMain.handle('warnings', (event, arg) => {
     return getWarnings()
