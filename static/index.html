@@ -6,12 +6,13 @@ body {
     margin: 0;
     padding: 0;
 }
-#main {
+.main {
     position: fixed;
     top: 50%;
     left: 50%;
     -webkit-transform: translate(-50%, -50%);
     transform: translate(-50%, -50%);
+    display: none;
 }
 #warning {
     color: red;
@@ -31,7 +32,8 @@ body {
 }
 </style>
 <div class='wrap'>
-<img id='main'>
+<img id='main-img' class="main">
+    <video id="main-video" class="main"></video>
 </div>
 <span id='warning'>
     System initializing. If this message is on the screen for more than a few seconds, something is broken.

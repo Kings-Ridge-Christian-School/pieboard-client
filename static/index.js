@@ -1,5 +1,7 @@
 let nonce, manifest
-let img = document.getElementById("main")
+let img = document.getElementById("main-img")
+let vod = document.getElementById("main-video")
+
 const width = 1920
 const height = 1080
 const normalRatio = width/height
@@ -21,35 +23,78 @@ async function get(message, content) {
     });
 }
 
+function Video(src, append) { // https://stackoverflow.com/questions/15286407/in-javascript-what-is-the-video-equivalent-of-new-audio
+    var v = document.createElement("video");
+    if (src != "") {
+        v.src = src;
+    }
+    if (append == true) {
+        document.body.appendChild(v);
+    }
+    return v;
+}
+
 async function runLoop() {
+    vod.pause()
     warningCheck()
     let tmp_current = current
     let changes = 0;
     let delay = 0;
-    for (frame in manifest) {
+    for (frame of manifest) {
         if (tmp_current == current) {
-            if (new Date(manifest[frame].expiration) > new Date() || manifest[frame].expiration == 0) {
-                changes++
-                let data = (await get('getImage', manifest[frame].hash))
-                var i = new Image(); 
-                i.onload = async () => {
-                    ratio = i.width/i.height
-                    if (normalRatio <= ratio) {
-                        img.style.width = "100%";
-                        img.style.height = "auto";
-                    } else {
-                        img.style.width = "auto";
-                        img.style.height = "100%";
-                    }
-                    img.src =  data
+            if (new Date(frame.expire) > new Date() || frame.expire == 0) {
+                switch (frame.type) {
+                    case "image":
+                        changes++
+                        let i = new Image();
+                        i.onload = async () => {
+                            ratio = i.width/i.height
+                            if (normalRatio <= ratio) {
+                                img.style.width = "100%";
+                                img.style.height = "auto";
+                            } else {
+                                img.style.width = "auto";
+                                img.style.height = "100%";
+                            }
+                            img.src =  `../data/img/${frame.hash}.${frame.extension}`
+                            img.style.display = "block"
+                            vod.style.display = "none"
+                        }
+                        i.src =  `../data/img/${frame.hash}.${frame.extension}`
+                        await sleep(frame.screentime*1000)
+                        break;
+                    case "video":
+                        let v = new Video();
+                        v.oncanplay = async() => {
+                            ratio = v.videoWidth/v.videoHeight
+                            if (normalRatio <= ratio) {
+                                vod.style.width = "100%";
+                                vod.style.height = "auto";
+                            } else {
+                                vod.style.width = "auto";
+                                vod.style.height = "100%";
+                            }
+                            vod.src =  `../data/img/${frame.hash}.${frame.extension}`
+                            img.style.display = "none"
+                            vod.style.display = "block"
+                            vod.volume = frame.volume/100
+                            vod.play()
+                        }
+                        v.src = `../data/img/${frame.hash}.${frame.extension}`
+                        await new Promise(r => {
+                            vod.addEventListener("ended", ()=> {
+                                r()
+                            })
+                        })
+                        changes++
                 }
-                i.src =  data
-                await sleep(manifest[frame].screentime*1000)
+
             }
         }
     }
     if (changes == 0) {
-        document.getElementById("main").src  = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D"
+        img.style.display = "none"
+        vod.style.display = "none"
         delay = 1000
     }
 
@@ -100,6 +145,7 @@ async function warningCheck() {
 async function init() {
     current = Math.random()
     manifest = await get("manifest", 0)
+    console.log(manifest);
     if (manifest == "new manifest") {
         manifest = {}
     }
