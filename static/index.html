@@ -1,44 +1,44 @@
-<style>
-body {
-    color: white;
-    background-color: black;
-    text-align: center;
-    margin: 0;
-    padding: 0;
-}
-.main {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    -webkit-transform: translate(-50%, -50%);
-    transform: translate(-50%, -50%);
-    display: none;
-}
-#warning {
-    color: red;
-    position: fixed;
-    left: 0;
-    top: 0;
-    text-align: left;
-}
-.updater {
-    color: white;
-    padding: 5px;
-    background-color: black;
-    margin: 5px;
-    border-radius: 3px;
-    border: 1px solid darkgray;
-    display: inline-block;
-}
-</style>
-<div class='wrap'>
-<img id='main-img' class="main">
-    <video id="main-video" class="main"></video>
+<head>
+    <link rel="stylesheet" href="./index.css">
+</head>
+<div id="warning">
 </div>
-<span id='warning'>
-    System initializing. If this message is on the screen for more than a few seconds, something is broken.
-</span>
+<div class="main">
+
+    <div id="new" class="announce">
+        <h1>PieBoard Configuration</h1>
+        <p>This device has not been configured. Please go to your PieBoard Server and create a device with the following information</p>
+        <br>
+        <p>Device Code</p>
+        <span id="newInitCode" class="tt">null</span><br>
+        <p>Possible Network Addresses</p>
+        <span id="newIPAddr" class="tt">null</span>
+    </div>
+
+    <div id="configured" class="announce">
+        <h1>PieBoard Configuration</h1>
+        <p>This device has successfully been claimed by the server</p>
+        <p>Please push to devices on the Pieboard Server to begin showing slides</p>
+    </div>
+
+    <div id="loading" class="announce">
+        <p>Device is being updated. Please wait</p>
+        <span id="loadingProgress"></span>
+    </div>
+
+    <div id="comm_fail" class="announce">
+        <h1>PieBoard Configuration</h1>
+        <p style="color: red">Configuration failed!</p>
+        <p>The server communicated with the device, but the server was unable to be contacted through its connection ip:</p>
+        <p class="tt" id="comm_failIP">null</p>
+    </div>
+
+
+    <div id="main">
+
+    </div>
+</div>
+
 <script>
-console.log("Init")
-require('./index.js')
+    require('./index.js')
 </script>
