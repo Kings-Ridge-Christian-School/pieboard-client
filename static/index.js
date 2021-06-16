@@ -2,7 +2,10 @@ const width = 1920
 const height = 1080
 const normalRatio = width/height
 
-const { ipcRenderer } = require('electron')
+const electron = window.require('electron');
+const ipcRenderer  = electron.ipcRenderer;
+
+import { define } from '../node_modules/synergy/dist/synergy.min.js'
 
 function sleep(ms) {
     return new Promise((resolve) => {
@@ -19,7 +22,6 @@ async function get(message, content) {
 }
 
 function hideAll() {
-    document.getElementById("static").style.display = "none"
     document.getElementById("configured").style.display = "none"
     document.getElementById("loading").style.display = "none"
     document.getElementById("comm_fail").style.display = "none"
@@ -27,7 +29,7 @@ function hideAll() {
     document.getElementById("warning").style.display = "none"
 }
 
-async function initialize() {
+async function initializeFront() {
     hideAll()
 
     if (!await get("isSetup")) {
@@ -48,6 +50,78 @@ async function initialize() {
         document.getElementById("configured").style.display = "block"
         return
     }
+
+    document.getElementById("main").style.display = 'block'
+    id = manifest.id
+    runner(manifest);
+}
+
+let id;
+
+function replaceCurrent(elem) {
+
+    function removeAllChildNodes(parent) {
+        while (parent.firstChild) {
+            parent.removeChild(parent.firstChild);
+        }
+    }
+
+    removeAllChildNodes(document.getElementById("current"))
+    document.getElementById("current").appendChild(elem)
+}
+
+async function runner(manifest) {
+    let slide = 0
+    let slideCount = 0
+    for (let slide of manifest.slides) {
+        if (id != manifest.id) return
+        switch (slide.type) {
+            case "image":
+                let img = document.createElement("img")
+                img.className = "insert"
+                img.addEventListener('load', () => {
+                    let ratio = img.width/img.height
+                    if (normalRatio <= ratio) {
+                        img.style.width = "100%";
+                        img.style.height = "auto";
+                    } else {
+                        img.style.width = "auto";
+                        img.style.height = "100%";
+                    }
+                    replaceCurrent(img)
+                })
+                img.addEventListener("error", (err) => console.error(err))
+                img.src = `../data/img/${slide.hash}.${slide.extension}`
+                await sleep(slide.screentime*1000)
+                break;
+            case "video":
+                let vod = document.createElement("video")
+                vod.className = "insert"
+                vod.addEventListener("canplay", () => {
+                    let ratio = vod.videoWidth/vod.videoHeight
+                    if (normalRatio <= ratio) {
+                        vod.style.width = "100%";
+                        vod.style.height = "auto";
+                    } else {
+                        vod.style.width = "auto";
+                        vod.style.height = "100%";
+                    }
+
+                    vod.volume = slide.volume/100
+                    replaceCurrent(vod)
+                    vod.play()
+                });
+
+                vod.src = `../data/img/${slide.hash}.${slide.extension}`
+                await new Promise(r => {
+                    vod.addEventListener("ended", ()=> {
+                        r()
+                    })
+                })
+                break;
+        }
+    }
+    setImmediate(runner, manifest)
 }
 
 function update(value) {
@@ -59,7 +133,7 @@ function update(value) {
 ipcRenderer.on("state", (event, msg) => {
     switch (msg[0]) {
         case "initialize":
-            initialize()
+            initializeFront()
             break;
         case "update":
             update(msg[1])

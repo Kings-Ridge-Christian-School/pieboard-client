@@ -4,7 +4,6 @@
 <div id="warning">
 </div>
 <div class="main">
-
     <div id="new" class="announce">
         <h1>PieBoard Configuration</h1>
         <p>This device has not been configured. Please go to your PieBoard Server and create a device with the following information</p>
@@ -32,13 +31,10 @@
         <p>The server communicated with the device, but the server was unable to be contacted through its connection ip:</p>
         <p class="tt" id="comm_failIP">null</p>
     </div>
-
-
-    <div id="main">
-
-    </div>
 </div>
-
-<script>
-    require('./index.js')
+<div id="main">
+    <div id="current"></div>
+</div>
+<script type="module">
+    import * as index from './index.js'
 </script>
