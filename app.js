@@ -1,6 +1,6 @@
 // general
 let device = {}
-let manifest, client
+let manifest, client, win
 // file handling
 const fs = require('fs')
 
@@ -74,8 +74,7 @@ async function getKeypair(name) {
 }
 
 async function encrypt(input, recvKey) {
-    if (typeof input == "Object") input = JSON.stringify(input)
-
+    if (typeof input == "object") input = JSON.stringify(input)
     const privateKey = await openpgp.readKey({ armoredKey: device.keys.private })
     const publicKey = await openpgp.readKey({armoredKey: recvKey})
 
@@ -113,6 +112,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const srv_app = express()
 const fetch = require('node-fetch')
+const { exec } = require('child_process')
 
 srv_app.use(bodyParser.json({limit: '2gb', extended: true}))
 srv_app.use(bodyParser.urlencoded({limit: '2gb', extended: true}))
@@ -175,6 +175,39 @@ srv_app.post("/client", async (req, res) => {
             res.send(await encrypt("ok", device.serverKey))
             update(action.data)
             break;
+        case "get_status":
+            res.send(await encrypt(await runHealthCheck(), device.serverKey))
+            break;
+        case "run_update":
+            res.send(await encrypt(await new Promise((resolve) => {
+                exec("git pull", (error, stdout, stderr) => {
+                    console.log(error, stdout, stderr)
+                    if (error) {
+                        resolve({
+                            "fail": true,
+                            "error": error
+                        })
+                        return
+                    }
+                    resolve({
+                        "fail": false
+                    })
+                    console.log("rebooting...")
+                    setTimeout(() => {
+                        exec("reboot")
+                    }, 5000)
+                });
+            }), device.serverKey))
+            break;
+        case "run_reboot":
+            res.send(await encrypt("ok", device.serverKey));
+                    console.log("rebooting...")
+                    setTimeout(() => {
+                        exec("reboot")
+                    }, 5000)
+            break;
+
+
     }
     // work on this
 });
@@ -225,7 +258,7 @@ ipcMain.handle('initialize', (event, arg) => {
 });
 
 function createWindow() {
-    let win = new BrowserWindow({
+    win = new BrowserWindow({
         width: 1920,
         height: 1080,
         //frame: false,
@@ -296,6 +329,18 @@ async function update(md) {
     await fs.promises.rmdir("data/img-old", {recursive: true})
     await writeJSON("data/manifest.json", md);
     client.send("state", ["initialize"])
+}
+
+async function runHealthCheck() {
+        let imageData = await new Promise((resolve) => {
+            win.webContents.capturePage().then(image => {
+                resolve(image.toDataURL())
+            });
+        });
+        return {
+            "manifest": manifest,
+            "screenshot": imageData
+        }
 }
 
 initialize()
