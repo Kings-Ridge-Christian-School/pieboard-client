@@ -41,7 +41,7 @@ async function initializeFront() {
         }
         ipList += "</table>"
         document.getElementById("newIPAddr").innerHTML = ipList
-        document.getElementById("static").style.display = "block"
+        document.getElementById("new").style.display = "block"
         return
     }
     let manifest = await get("manifest");

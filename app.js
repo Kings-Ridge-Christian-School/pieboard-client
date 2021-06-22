@@ -17,12 +17,14 @@ function readJSON(path) {
 }
 
 
-function writeJSON(path, data) {
+function writeJSON(path, data, remount) {
     return new Promise(async (resolve, reject) => {
-        fs.writeFile(path, JSON.stringify(data), (err) => {
+        if (remount)     await execute("rw")
+        fs.writeFile(path, JSON.stringify(data), async(err) => {
                 if (err) {
                     reject(err)
                 } else {
+                    if (remount) await execute("ro")
                     resolve(err)
                 }
             });
@@ -106,6 +108,13 @@ async function decrypt(message, recvKey) {
     return out.data
 }
 
+function execute(command) {
+    return new Promise((resolve) => {
+        exec(command, (err, stdout, stderr) => {
+            resolve(stdout)
+        })
+    })
+}
 
 // client-server communications
 const express = require('express')
@@ -160,7 +169,7 @@ srv_app.post("/setup", async (req, res) => {
 
             device.server = server_addr
             device.serverKey = req.body.key
-            await writeJSON("./data/config.json", device);
+            await writeJSON("./data/config.json", device, true);
         }, 1000)
     } else res.send("no")
 })
@@ -168,7 +177,7 @@ srv_app.post("/setup", async (req, res) => {
 srv_app.post("/client", async (req, res) => {
     let action = await decrypt(req.body.msg, device.serverKey)
     device.localIP = req.socket.localAddress.replace(/^.*:/, '')
-    await writeJSON("data/config.json", device)
+    await writeJSON("data/config.json", device, true)
     action = JSON.parse(action);
     switch (action.act) {
         case "put_manifest":
@@ -261,7 +270,7 @@ function createWindow() {
     win = new BrowserWindow({
         width: 1920,
         height: 1080,
-        //frame: false,
+        frame: false,
         webPreferences: {
             nodeIntegration: true
         }
@@ -310,6 +319,7 @@ async function update(md) {
     client.send("state", ["update", "Preparing..."])
     let slideCount = md.slides.length
     let current = 0
+    await execute("rw")
     await fs.promises.rename("data/img", "data/img-old")
     await fs.promises.mkdir("data/img")
     for (let slide of md.slides) {
@@ -328,6 +338,7 @@ async function update(md) {
     manifest = md
     await fs.promises.rmdir("data/img-old", {recursive: true})
     await writeJSON("data/manifest.json", md);
+    await execute("ro")
     client.send("state", ["initialize"])
 }
 

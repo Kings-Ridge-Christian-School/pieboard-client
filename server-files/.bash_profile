@@ -1,1 +1,0 @@
-sudo xinit /home/pi/.xinitrc -- -nocursor
