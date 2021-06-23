@@ -1,36 +1,44 @@
+sudo apt update
 sudo apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates git
 curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-sudo apt -y install xinit nodejs libnss3-dev libatk-bridge2.0-0 libgtk-3-dev libatspi-dev libcups2 libxss1
-sudo apt update
+sudo apt -y install xinit nodejs libnss3-dev libatk-bridge2.0-0 libgtk-3-dev libatspi-dev libcups2 libxss1 x11-xserver-utils
 sudo apt remove --purge triggerhappy logrotate dphys-swapfile -y
 sudo apt autoremove --purge -y
-sed -i ':a;N;$!ba;s/\n/ fastboot noswap ro/g' /boot/cmdline.txt
+sudo sed -i 's/rootwait/rootwait fastboot noswap ro/g' /boot/cmdline.txt
+sudo sed -i 's/allowed_users=console/allowed_users=anybody/g' /etc/X11/Xwrapper.config
+
 sudo apt install busybox-syslogd -y
 sudo apt remove --purge rsyslog -y
 sudo sed -i 's/vfat    defaults/vfat    defaults,ro/g' /etc/fstab
+
+sudo tee -a /etc/fstab > /dev/null <<EOT
+tmpfs        /tmp            tmpfs   mode=1777,nosuid,nodev,exec         0       0
+tmpfs        /var/log        tmpfs   mode=1777,nosuid,nodev,exec         0       0
+tmpfs        /var/tmp        tmpfs   mode=1777,nosuid,nodev,exec         0       0
+EOT
+
 sudo sed -i 's/noatime/noatime,ro/g' /etc/fstab
 sudo rm -rf /var/lib/dhcp /var/lib/dhcpcd5 /var/spool /etc/resolv.conf /home/pi/.Xauthority
-sudo ln -s /tmp /var/lib/dhcp
-sudo ln -s /tmp /var/lib/dhcpcd5
-sudo ln -s /tmp /var/spool
-sudo ln -s /tmp /home/pi/.Xauthority
+sudo ln -s /tmp/dhcp /var/lib/dhcp
+sudo ln -s /tmp/dhcpcd5 /var/lib/dhcpcd5
+sudo ln -s /tmp/spool /var/spool
+sudo ln -s /tmp/.Xauthority /home/pi/.Xauthority
 sudo touch /tmp/dhcpcd.resolv.conf
 sudo ln -s /tmp/dhcpcd.resolv.conf /etc/resolv.conf
-sudo sh -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'
+sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+sudo sh -c 'echo "pieboard" > /etc/hostname'
+
+
 sudo rm /var/lib/systemd/random-seed
 sudo ln -s /tmp/random-seed /var/lib/systemd/random-seed
 sudo sed  '/\[Service\]/a ExecStartPre=/bin/echo "" >/tmp/random-seed' /lib/systemd/system/systemd-random-seed.service > /tmp/rs.service
 
 sudo cp /tmp/rs.service /lib/systemd/system/systemd-random-seed.service
-sudo tee -a /etc/bash.bashrc > /dev/null <<EOT
-set_bash_prompt() {
-    fs_mode=$(mount | sed -n -e "s/^\/dev\/.* on \/ .*(\(r[w|o]\).*/\1/p")
-    PS1='\[\033[01;32m\]\u@\h${fs_mode:+($fs_mode)}\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
-}
-alias ro='sudo mount -o remount,ro / ; sudo mount -o remount,ro /boot'
-alias rw='sudo mount -o remount,rw / ; sudo mount -o remount,rw /boot'
-PROMPT_COMMAND=set_bash_prompt
-EOT
+
+sudo sh -c 'echo "sudo mount -o remount,ro / ; sudo mount -o remount,ro /boot" > /bin/ro'
+sudo sh -c 'echo "sudo mount -o remount,rw / ; sudo mount -o remount,rw /boot" > /bin/rw'
+
+sudo chmod +x /bin/ro /bin/rw
 
 sudo tee -a /etc/bash.bash_logout > /dev/null <<EOT
 mount -o remount,ro /
@@ -43,7 +51,14 @@ git clone https://github.com/kings-ridge-christian-school/pieboard-client --bran
 cd pieboard-client
 npm install
 
-sudo sed -i 's/9600 /9600 --autologin pi /g' /lib/systemd/system/serial-getty@.service
+sudo systemctl set-default multi-user.target
+sudo ln -fs /lib/systemd/system/getty@.service /etc/systemd/system/getty.target.wants/getty@tty1.service
+sudo tee -a /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null <<EOT
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin pi --noclear %I \$TERM
+EOT
+
 sudo systemctl daemon-reload
 sudo tee -a /boot/config.txt > /dev/null <<EOT
 disable_overscan=1
@@ -52,13 +67,15 @@ EOT
 echo "sudo xinit /home/pi/.xinitrc -- -nocursor" > ~/.bash_profile
 chmod +x ~/.bash_profile
 
-tee -a ~/.xinitrc > /dev/null <<EOT
+tee ~/.xinitrc > /dev/null <<EOT
 xset s off
 xset -dpms
 xset s noblank
-sudo sh -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'
-rw
-cd pieboard-client && sudo npm start
+sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+cd pieboard-client && npm start
 EOT
+
+sudo timedatectl set-ntp True
+sudo timedatectl set-timezone GMT+0
 
 sudo reboot

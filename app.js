@@ -100,7 +100,7 @@ async function decrypt(message, recvKey) {
         decryptionKeys: await openpgp.readKey({ armoredKey: device.keys.private })
     });
 
-    if (!out.signatures[0].valid) {
+    if (!out.signatures[0].signature.packets[0].verified) { // ignore date checks
         console.log("Message wasnt signed, ignoring")
         return
     }
