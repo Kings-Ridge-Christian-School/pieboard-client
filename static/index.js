@@ -27,6 +27,7 @@ function hideAll() {
     document.getElementById("comm_fail").style.display = "none"
     document.getElementById("main").style.display = "none"
     document.getElementById("warning").style.display = "none"
+    document.getElementById("new").style.display = "none"
 }
 
 async function initializeFront() {

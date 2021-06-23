@@ -9,10 +9,11 @@ sudo apt install busybox-syslogd -y
 sudo apt remove --purge rsyslog -y
 sudo sed -i 's/vfat    defaults/vfat    defaults,ro/g' /etc/fstab
 sudo sed -i 's/noatime/noatime,ro/g' /etc/fstab
-sudo rm -rf /var/lib/dhcp /var/lib/dhcpcd5 /var/spool /etc/resolv.conf
+sudo rm -rf /var/lib/dhcp /var/lib/dhcpcd5 /var/spool /etc/resolv.conf /home/pi/.Xauthority
 sudo ln -s /tmp /var/lib/dhcp
 sudo ln -s /tmp /var/lib/dhcpcd5
 sudo ln -s /tmp /var/spool
+sudo ln -s /tmp /home/pi/.Xauthority
 sudo touch /tmp/dhcpcd.resolv.conf
 sudo ln -s /tmp/dhcpcd.resolv.conf /etc/resolv.conf
 sudo sh -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'

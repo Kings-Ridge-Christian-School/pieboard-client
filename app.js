@@ -188,8 +188,9 @@ srv_app.post("/client", async (req, res) => {
             res.send(await encrypt(await runHealthCheck(), device.serverKey))
             break;
         case "run_update":
-            res.send(await encrypt(await new Promise((resolve) => {
-                exec("git pull", (error, stdout, stderr) => {
+            res.send(await encrypt(await new Promise(async (resolve) => {
+                await execute("rw")
+                exec("git pull", async (error, stdout, stderr) => {
                     console.log(error, stdout, stderr)
                     if (error) {
                         resolve({
@@ -202,6 +203,7 @@ srv_app.post("/client", async (req, res) => {
                         "fail": false
                     })
                     console.log("rebooting...")
+                    await execute("npm i")
                     setTimeout(() => {
                         exec("reboot")
                     }, 5000)
@@ -290,7 +292,7 @@ async function initialize() {
     manifest = await readJSON("data/manifest.json")
     if (!manifest) {
         manifest = {}
-        await writeJSON("data/manifest.json", manifest);
+        await writeJSON("data/manifest.json", manifest, true);
     }
 
     if (!config) {
@@ -304,7 +306,7 @@ async function initialize() {
             "localIP": null
         }
 
-        await writeJSON("data/config.json", config);
+        await writeJSON("data/config.json", config, true);
     }
 
     device = config
