@@ -202,10 +202,11 @@ srv_app.post("/client", async (req, res) => {
                     resolve({
                         "fail": false
                     })
-                    console.log("rebooting...")
+                    console.log("Running npm install")
                     await execute("npm i")
+                    console.log("rebooting...")
                     setTimeout(() => {
-                        exec("reboot")
+                        exec("sudo reboot")
                     }, 5000)
                 });
             }), device.serverKey))
@@ -214,7 +215,7 @@ srv_app.post("/client", async (req, res) => {
             res.send(await encrypt("ok", device.serverKey));
                     console.log("rebooting...")
                     setTimeout(() => {
-                        exec("reboot")
+                        exec("sudo reboot")
                     }, 5000)
             break;
 
