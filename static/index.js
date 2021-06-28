@@ -91,7 +91,7 @@ async function runner(manifest) {
                     }
                     replaceCurrent(img)
                 })
-                img.addEventListener("error", (err) => console.error(err))
+                img.addEventListener("error", (err) => console.log(err))
                 img.src = `../data/img/${slide.hash}.${slide.extension}`
                 await sleep(slide.screentime*1000)
                 break;

@@ -112,6 +112,8 @@ function execute(command) {
     return new Promise((resolve) => {
         exec(command, (err, stdout, stderr) => {
             resolve(stdout)
+            if (err) console.log(command, "error", err)
+            if (stderr) console.log(command, "stderr", stderr)
         })
     })
 }
@@ -342,15 +344,18 @@ async function update(md) {
     await fs.promises.rmdir("data/img-old", {recursive: true})
     await writeJSON("data/manifest.json", md);
     await execute("ro")
-    client.send("state", ["initialize"])
+    win.reload()
 }
 
 async function runHealthCheck() {
-        let imageData = await new Promise((resolve) => {
-            win.webContents.capturePage().then(image => {
-                resolve(image.toDataURL())
-            });
+    let imageData = await new Promise(async (resolve) => {
+        await execute("scrot /tmp/img.png")
+        fs.readFile("/tmp/img.png", (err, data) => {
+            let base64Image = new Buffer(data, 'binary').toString('base64');
+            let imgSrcString = `data:image/png;base64,${base64Image}`;
+            resolve(imgSrcString)
         });
+    })
         return {
             "manifest": manifest,
             "screenshot": imageData
