@@ -72,6 +72,9 @@ xset s off
 xset -dpms
 xset s noblank
 sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+rw
+sudo date -s "$(wget -qSO- --max-redirect=0 www.google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
+ro
 cd pieboard-client && npm start
 EOT
 

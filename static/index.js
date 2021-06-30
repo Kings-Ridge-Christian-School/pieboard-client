@@ -72,55 +72,61 @@ function replaceCurrent(elem) {
 }
 
 async function runner(manifest) {
-    let slide = 0
-    let slideCount = 0
+    let expires = 0
     for (let slide of manifest.slides) {
         if (id != manifest.id) return
-        switch (slide.type) {
-            case "image":
-                let img = document.createElement("img")
-                img.className = "insert"
-                img.addEventListener('load', () => {
-                    let ratio = img.width/img.height
-                    if (normalRatio <= ratio) {
-                        img.style.width = "100%";
-                        img.style.height = "auto";
-                    } else {
-                        img.style.width = "auto";
-                        img.style.height = "100%";
-                    }
-                    replaceCurrent(img)
-                })
-                img.addEventListener("error", (err) => console.log(err))
-                img.src = `../data/img/${slide.hash}.${slide.extension}`
-                await sleep(slide.screentime*1000)
-                break;
-            case "video":
-                let vod = document.createElement("video")
-                vod.className = "insert"
-                vod.addEventListener("canplay", () => {
-                    let ratio = vod.videoWidth/vod.videoHeight
-                    if (normalRatio <= ratio) {
-                        vod.style.width = "100%";
-                        vod.style.height = "auto";
-                    } else {
-                        vod.style.width = "auto";
-                        vod.style.height = "100%";
-                    }
-
-                    vod.volume = slide.volume/100
-                    replaceCurrent(vod)
-                    vod.play()
-                });
-
-                vod.src = `../data/img/${slide.hash}.${slide.extension}`
-                await new Promise(r => {
-                    vod.addEventListener("ended", ()=> {
-                        r()
+        if (slide.expire != 0 && slide.expire < new Date()/1) {
+            expires++
+        } else {
+            switch (slide.type) {
+                case "image":
+                    let img = document.createElement("img")
+                    img.className = "insert"
+                    img.addEventListener('load', () => {
+                        let ratio = img.width / img.height
+                        if (normalRatio <= ratio) {
+                            img.style.width = "100%";
+                            img.style.height = "auto";
+                        } else {
+                            img.style.width = "auto";
+                            img.style.height = "100%";
+                        }
+                        replaceCurrent(img)
                     })
-                })
-                break;
+                    img.addEventListener("error", (err) => console.log(err))
+                    img.src = `../data/img/${slide.hash}.${slide.extension}`
+                    await sleep(slide.screentime * 1000)
+                    break;
+                case "video":
+                    let vod = document.createElement("video")
+                    vod.className = "insert"
+                    vod.addEventListener("canplay", () => {
+                        let ratio = vod.videoWidth / vod.videoHeight
+                        if (normalRatio <= ratio) {
+                            vod.style.width = "100%";
+                            vod.style.height = "auto";
+                        } else {
+                            vod.style.width = "auto";
+                            vod.style.height = "100%";
+                        }
+
+                        vod.volume = slide.volume / 100
+                        replaceCurrent(vod)
+                        vod.play()
+                    });
+
+                    vod.src = `../data/img/${slide.hash}.${slide.extension}`
+                    await new Promise(r => {
+                        vod.addEventListener("ended", () => {
+                            r()
+                        })
+                    })
+                    break;
+            }
         }
+    }
+    if (expires == manifest.slides.length) {
+        replaceCurrent(document.createElement("span"))
     }
     setImmediate(runner, manifest)
 }
