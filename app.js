@@ -288,8 +288,9 @@ function createWindow() {
 const { v4: uuidv4 } = require('uuid');
 
 async function initialize() {
+    await execute("rw")
     await fs.promises.mkdir('data/img', { recursive: true })
-
+    await execute("ro")
     let config = await readJSON("data/config.json")
 
     manifest = await readJSON("data/manifest.json")
