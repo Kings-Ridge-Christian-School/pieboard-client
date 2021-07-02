@@ -192,12 +192,14 @@ srv_app.post("/client", async (req, res) => {
         case "run_update":
             res.send(await encrypt(await new Promise(async (resolve) => {
                 await execute("rw")
+                await exec("git reset --hard")
                 exec("git pull", async (error, stdout, stderr) => {
                     console.log(error, stdout, stderr)
                     if (error) {
                         resolve({
                             "fail": true,
-                            "error": error
+                            "error": error,
+                            "stderr": stderr
                         })
                         return
                     }
