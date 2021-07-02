@@ -1,7 +1,7 @@
 sudo apt update
 sudo apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates git
 curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-sudo apt -y install xinit nodejs libnss3-dev libatk-bridge2.0-0 libgtk-3-dev libatspi-dev libcups2 libxss1 x11-xserver-utils
+sudo apt -y install xinit nodejs libnss3-dev libatk-bridge2.0-0 libgtk-3-dev libatspi-dev libcups2 libxss1 x11-xserver-utils ntp
 sudo apt remove --purge triggerhappy logrotate dphys-swapfile -y
 sudo apt autoremove --purge -y
 sudo sed -i 's/rootwait/rootwait fastboot noswap ro/g' /boot/cmdline.txt
@@ -25,7 +25,6 @@ sudo ln -s /tmp/spool /var/spool
 sudo ln -s /tmp/.Xauthority /home/pi/.Xauthority
 sudo touch /tmp/dhcpcd.resolv.conf
 sudo ln -s /tmp/dhcpcd.resolv.conf /etc/resolv.conf
-sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 sudo sh -c 'echo "pieboard" > /etc/hostname'
 
 
@@ -47,7 +46,7 @@ EOT
 
 
 cd ~
-git clone https://github.com/kings-ridge-christian-school/pieboard-client --branch v2
+git clone https://github.com/kings-ridge-christian-school/pieboard-client
 cd pieboard-client
 npm install
 
@@ -71,14 +70,14 @@ tee ~/.xinitrc > /dev/null <<EOT
 xset s off
 xset -dpms
 xset s noblank
-sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 rw
-sudo date -s "$(wget -qSO- --max-redirect=0 www.google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
+sudo service ntp stop
+sudo ntpdate -s time.nist.gov
+sudo service ntp start
 ro
 cd pieboard-client && npm start
 EOT
 
-sudo timedatectl set-ntp True
 sudo timedatectl set-timezone GMT+0
 
 sudo reboot
