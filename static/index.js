@@ -3,6 +3,7 @@ const height = 1080
 const normalRatio = width/height
 
 const electron = window.require('electron');
+const Hls = window.require('hls.js')
 const ipcRenderer  = electron.ipcRenderer;
 
 import { define } from '../node_modules/synergy/dist/synergy.min.js'
@@ -122,6 +123,54 @@ async function runner(manifest) {
                         })
                     })
                     break;
+                case "live":
+                    let live = document.createElement("video")
+                    live.className = "insert"
+                    let playing = false
+                    let hls = new Hls();
+                    hls.loadSource(slide.url);
+                    hls.attachMedia(live);
+
+                    hls.on(Hls.Events.MANIFEST_PARSED,function() {
+                        let ratio = live.videoWidth / live.videoHeight
+                        if (normalRatio <= ratio) {
+                            live.style.width = "100%";
+                            live.style.height = "auto";
+                        } else {
+                            live.style.width = "auto";
+                            live.style.height = "100%";
+                        }
+                        live.volume = slide.volume / 100
+                        replaceCurrent(live)
+                        live.play()
+                        playing = true
+                    });
+
+                    await new Promise((r) => {
+                        hls.on(Hls.Events.ERROR, function (event, data) {
+                            console.log("Stream Error", event, data)
+                            clearTimeout(tmt)
+                            r()
+                        });
+                        let tmt = setTimeout(async () => {
+                            if (playing) { // if stream cant play, skip
+                                if (slide.expire != 0) {
+                                    setTimeout(() => {
+                                        r()
+                                    }, slide.expire - (new Date()/1))
+                                }
+
+                                await new Promise(res => {
+                                    live.addEventListener("ended", () => {
+                                        r()
+                                    })
+                                })
+                            } else {
+                                r()
+                            }
+                        }, 10000)
+                    })
+                    live.pause()
             }
         }
     }
