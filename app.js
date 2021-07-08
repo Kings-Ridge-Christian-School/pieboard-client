@@ -192,7 +192,7 @@ srv_app.post("/client", async (req, res) => {
         case "run_update":
             res.send(await encrypt(await new Promise(async (resolve) => {
                 await execute("rw")
-                await exec("git reset --hard")
+                await execute("git reset --hard")
                 exec("git pull", async (error, stdout, stderr) => {
                     console.log(error, stdout, stderr)
                     if (error) {
@@ -208,6 +208,8 @@ srv_app.post("/client", async (req, res) => {
                     })
                     console.log("Running npm install")
                     await execute("npm i")
+                    console.log("Running post-update script")
+                    await execute("./post-update.sh") // this will only be needed in some instances
                     console.log("rebooting...")
                     setTimeout(() => {
                         exec("sudo reboot")
@@ -222,8 +224,15 @@ srv_app.post("/client", async (req, res) => {
                         exec("sudo reboot")
                     }, 5000)
             break;
-
-
+        case "run_reset":
+            res.send(await encrypt("ok", device.serverKey));
+            await execute("rw")
+            await execute("rm -rf data")
+            console.log("rebooting...")
+            setTimeout(() => {
+                exec("sudo reboot")
+            }, 5000)
+            break;
     }
     // work on this
 });
