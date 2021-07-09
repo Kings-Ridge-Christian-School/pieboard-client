@@ -196,6 +196,7 @@ ipcRenderer.on("state", (event, msg) => {
             break;
         case "comm_fail":
             hideAll()
+            initializeFront()
             document.getElementById("comm_failIP").innerHTML = msg[1]
             document.getElementById("comm_fail").style.display = "block"
             break;

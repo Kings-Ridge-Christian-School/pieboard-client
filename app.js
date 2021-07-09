@@ -189,6 +189,9 @@ srv_app.post("/client", async (req, res) => {
         case "get_status":
             res.send(await encrypt(await runHealthCheck(), device.serverKey))
             break;
+        case "get_manifest":
+            res.send(await encrypt(manifest, device.serverKey))
+            break;
         case "run_update":
             res.send(await encrypt(await new Promise(async (resolve) => {
                 await execute("rw")
