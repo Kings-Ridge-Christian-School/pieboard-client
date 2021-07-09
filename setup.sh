@@ -4,7 +4,7 @@ sudo systemctl start ssh
 sudo apt update
 sudo apt -y install curl dirmngr apt-transport-https lsb-release ca-certificates git
 curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-sudo apt -y install xinit nodejs libnss3-dev libatk-bridge2.0-0 libgtk-3-dev libatspi-dev libcups2 libxss1 x11-xserver-utils ntp
+sudo apt -y install xinit nodejs libnss3-dev libatk-bridge2.0-0 libgtk-3-dev libatspi-dev libcups2 libxss1 x11-xserver-utils ntp ntpdate scrot
 sudo apt remove --purge triggerhappy logrotate dphys-swapfile -y
 sudo apt autoremove --purge -y
 sudo sed -i 's/rootwait/rootwait fastboot noswap ro/g' /boot/cmdline.txt
@@ -29,7 +29,7 @@ sudo ln -s /tmp/.Xauthority /home/pi/.Xauthority
 sudo touch /tmp/dhcpcd.resolv.conf
 sudo ln -s /tmp/dhcpcd.resolv.conf /etc/resolv.conf
 sudo sh -c 'echo "pieboard" > /etc/hostname'
-
+sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 
 sudo rm /var/lib/systemd/random-seed
 sudo ln -s /tmp/random-seed /var/lib/systemd/random-seed
@@ -66,7 +66,7 @@ sudo tee -a /boot/config.txt > /dev/null <<EOT
 disable_overscan=1
 EOT
 
-echo "sudo xinit /home/pi/.xinitrc -- -nocursor" > ~/.bash_profile
+echo "xinit /home/pi/.xinitrc -- -nocursor" > ~/.bash_profile
 chmod +x ~/.bash_profile
 
 tee ~/.xinitrc > /dev/null <<EOT
