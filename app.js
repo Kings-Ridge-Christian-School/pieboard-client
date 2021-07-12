@@ -1,68 +1,35 @@
-const express = require('express')
-const md5 = require('md5');
-const fs = require('fs');
-const fetch = require('node-fetch')
-const os = require('os')
-require('dotenv').config()
-const exec = require('child_process').exec;
-const MAX_ACTIVE = process.env.MAX_ACTIVE || 10
-const srv_app = express()
-const NOSLIDE_WARNING = process.env.NOSLIDE_WARNING || true
+// general
+let device = {}
+let manifest, client, win
+// file handling
+const fs = require('fs')
 
-const { app, BrowserWindow, ipcMain } = require('electron')
-
-
-const bodyParser = require('body-parser')
-srv_app.use(bodyParser.json({limit: '2gb', extended: true}))
-srv_app.use(bodyParser.urlencoded({limit: '2gb', extended: true}))
-
-
-function get(url) {
-    return new Promise(async (resolve) => {
-        let response = await fetch(url);
-        resolve(response.text());
-        response = null
-    });
-}
-
-async function pipeToLocation(url, location) { 
-    const res = await fetch(url);
+function readJSON(path) {
     return new Promise((resolve, reject) => {
-      const fileStream = fs.createWriteStream(location);
-      res.body.pipe(fileStream);
-      res.body.on("error", (err) => {
-        reject(err);
-      });
-      fileStream.on("finish", function() {
-        resolve();
-      });
-    });
+        fs.access(path, fs.F_OK, async (err) => {
+            if (err) {
+                resolve()
+            } else {
+                resolve(JSON.parse(await fs.promises.readFile(path, "utf8")))
+            }
+        })
+    })
 }
 
-function post(url, data) {
+
+function writeJSON(path, data, remount) {
     return new Promise(async (resolve, reject) => {
-        try {
-            let response = await fetch(url, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(data)
+        if (remount)     await execute("rw")
+        fs.writeFile(path, JSON.stringify(data), async(err) => {
+                if (err) {
+                    reject(err)
+                } else {
+                    if (remount) await execute("ro")
+                    resolve(err)
+                }
             });
-            resolve(response.json());
-        } catch(e) {
-            reject(e)
-        }
-    });
+        });
 }
-
-
-const dir = __dirname + "/static/"
-const port = process.env.GLOBAL_PORT || 3030
-const auth = process.env.AUTH_CODE || ""
-const img_path = __dirname + "/data/img/"
-let manifest, lock
-let currentlyProcessing = 0
-let totalProcessing = 0
-let lastImage = ""
 
 function exists(path) {
     return new Promise(async (resolve, reject) => {
@@ -74,34 +41,218 @@ function exists(path) {
         });
     });
 }
-function delFile(path) { 
+function delFile(path) {
     return new Promise(async (resolve, reject) => {
         fs.unlink(path, (err) => {
             err ? reject(err) : resolve()
         })
     });
 }
-function cleanImages() {
-    let tmp_hash = []
-    for (image of manifest.data) {
-        tmp_hash.push(`${image.hash}.${image.extension}`)
-    }
-    fs.readdir(img_path, async (err, files) => {
-        for (let file in files) {
-            if (!tmp_hash.includes(files[file])) {
-                await delFile(img_path + files[file])
-                console.log(`Deleted ${files[file]}`)
-            }
-        }
+
+async function pipeToLocation(url, location) {
+    const res = await fetch(url);
+    return new Promise((resolve, reject) => {
+        const fileStream = fs.createWriteStream(location);
+        res.body.pipe(fileStream);
+        res.body.on("error", (err) => {
+            reject(err);
+        });
+        fileStream.on("finish", function() {
+            resolve();
+        });
     });
 }
 
+// cryptography
+const openpgp = require('openpgp')
+
+async function getKeypair(name) {
+    let keys = await openpgp.generateKey({curve: "ed25519", userIDs: [{"name": name}]})
+    return {
+        "private": keys.privateKeyArmored,
+        "public": keys.publicKeyArmored,
+        "revocation": keys.revocationCertificate
+    }
+}
+
+async function encrypt(input, recvKey) {
+    if (typeof input == "object") input = JSON.stringify(input)
+    const privateKey = await openpgp.readKey({ armoredKey: device.keys.private })
+    const publicKey = await openpgp.readKey({armoredKey: recvKey})
+
+    let options = {
+        message: await openpgp.createMessage({text: input}),
+        encryptionKeys: publicKey,
+        signingKeys: privateKey
+    }
+
+    const out = await openpgp.encrypt(options)
+
+    return out
+}
+
+async function decrypt(message, recvKey) {
+    const out = await openpgp.decrypt({
+        message: await openpgp.readMessage({
+            armoredMessage: message // parse armored message
+        }),
+        verificationKeys: await openpgp.readKey({armoredKey: recvKey}),
+        decryptionKeys: await openpgp.readKey({ armoredKey: device.keys.private })
+    });
+
+    if (!out.signatures[0].signature.packets[0].verified) { // ignore date checks
+        console.log("Message wasnt signed, ignoring")
+        return
+    }
+
+    return out.data
+}
+
+function execute(command) {
+    return new Promise((resolve) => {
+        exec(command, (err, stdout, stderr) => {
+            resolve(stdout)
+            if (err) console.log(command, "error", err)
+            if (stderr) console.log(command, "stderr", stderr)
+        })
+    })
+}
+
+// client-server communications
+const express = require('express')
+const bodyParser = require('body-parser')
+const srv_app = express()
+const fetch = require('node-fetch')
+const { exec } = require('child_process')
+
+srv_app.use(bodyParser.json({limit: '2gb', extended: true}))
+srv_app.use(bodyParser.urlencoded({limit: '2gb', extended: true}))
+
+async function sendServerCommand(address, key, message) {
+    let data = await new Promise(async(resolve) => {
+        fetch(`${address}/client`, {
+            "method": "post",
+            headers: {'Content-Type': 'application/json'},
+            timeout: 5000,
+            body: JSON.stringify({
+                "msg": await encrypt(JSON.stringify(message), key),
+                "id": device.id
+            })
+        }).then((res) => res.text())
+            .then(async body => await decrypt(body, key))
+            .then(out => resolve(out))
+            .catch((err) => {
+                console.log(err);
+                resolve()
+            })
+    });
+    return data
+}
+
+srv_app.post("/setup", async (req, res) => {
+    if (!device.server) {
+        if (device.localID.substring(0, 8) != req.body.id) {
+            res.send("auth")
+            return
+        }
+        res.send(device.keys.public)
+        setTimeout(async ()=> {
+            let server_addr = req.body.server_address
+
+            device.id = req.body.device_id
+
+            let serverResponse = await sendServerCommand(server_addr, req.body.key, {"act":"register"})
+
+            if (serverResponse) client.send("state", ["initialize"])
+            else {
+                client.send("state", ["comm_fail", server_addr])
+                return
+            }
+
+            device.server = server_addr
+            device.serverKey = req.body.key
+            await writeJSON("./data/config.json", device, true);
+        }, 1000)
+    } else res.send("no")
+})
+
+srv_app.post("/client", async (req, res) => {
+    let action = await decrypt(req.body.msg, device.serverKey)
+    device.localIP = req.socket.localAddress.replace(/^.*:/, '')
+    await writeJSON("data/config.json", device, true)
+    action = JSON.parse(action);
+    switch (action.act) {
+        case "put_manifest":
+            res.send(await encrypt("ok", device.serverKey))
+            update(action.data)
+            break;
+        case "get_status":
+            res.send(await encrypt(await runHealthCheck(), device.serverKey))
+            break;
+        case "get_manifest":
+            res.send(await encrypt(manifest, device.serverKey))
+            break;
+        case "run_update":
+            res.send(await encrypt(await new Promise(async (resolve) => {
+                await execute("rw")
+                await execute("git reset --hard")
+                exec("git pull", async (error, stdout, stderr) => {
+                    console.log(error, stdout, stderr)
+                    if (error) {
+                        resolve({
+                            "fail": true,
+                            "error": error,
+                            "stderr": stderr
+                        })
+                        return
+                    }
+                    resolve({
+                        "fail": false
+                    })
+                    console.log("Running npm install")
+                    await execute("npm i")
+                    console.log("Running post-update script")
+                    await execute("./post-update.sh") // this will only be needed in some instances
+                    console.log("rebooting...")
+                    setTimeout(() => {
+                        exec("sudo reboot")
+                    }, 5000)
+                });
+            }), device.serverKey))
+            break;
+        case "run_reboot":
+            res.send(await encrypt("ok", device.serverKey));
+                    console.log("rebooting...")
+                    setTimeout(() => {
+                        exec("sudo reboot")
+                    }, 5000)
+            break;
+        case "run_reset":
+            res.send(await encrypt("ok", device.serverKey));
+            await execute("rw")
+            await execute("rm -rf data")
+            console.log("rebooting...")
+            setTimeout(() => {
+                exec("sudo reboot")
+            }, 5000)
+            break;
+    }
+    // work on this
+});
+
+srv_app.listen(44172, () => {
+    console.log("Server is listening")
+})
+
+// network configuration
+const os = require('os')
+
 function getInterfaces() {
-    var ifaces = os.networkInterfaces();
+    let ifaces = os.networkInterfaces();
     let names = []
-    for (iface in ifaces) {
+    for (let iface in ifaces) {
         for (alias of ifaces[iface]) {
-            if (alias.internal == false) {
+            if (alias.internal == false && alias.mac != "00:00:00:00:00:00") {
                 names.push({"name": iface, "address": alias.address, "mac": alias.mac})
             }
         }
@@ -109,176 +260,121 @@ function getInterfaces() {
     return names
 }
 
-async function slideDownload(slide, address, port) {
-     await pipeToLocation(`http://${address}:${port}/api/slide/get/${slide.hash}.${slide.extension}`, img_path + `${slide.hash}.${slide.extension}`)
-     currentlyProcessing--
-    console.log(`Saved ${slide.hash} (${(totalProcessing-currentlyProcessing)}/${totalProcessing})`)
-}
 
-async function processManifest(newManifest) {
-    currentlyProcessing = newManifest.data.length
-    totalProcessing = newManifest.data.length
-    console.log(`Checking ${currentlyProcessing} slides`)
-    for (slide of newManifest.data) {
-        if (await exists(`${img_path}${slide.hash}.${slide.extension}`)) {
-            currentlyProcessing--
-            console.log(`${slide.hash}.${slide.extension} already saved`)
-        } else {
-            await slideDownload(slide, newManifest.address, newManifest.port);
+// electron
+const { app, BrowserWindow, ipcMain } =  require('electron')
+
+
+ipcMain.handle('isSetup', (event, arg) => {
+    return device.server ? true : false
+})
+
+ipcMain.handle('setupInfo', async (event, arg) => {
+    return {
+        "id": device.localID.substring(0, 8),
+        "ip": await getInterfaces()
+    }
+})
+
+ipcMain.handle('manifest', (event, arg) => {
+   return manifest
+});
+
+ipcMain.handle('initialize', (event, arg) => {
+    client = event.sender
+    client.send("state", ["initialize"])
+});
+
+function createWindow() {
+    win = new BrowserWindow({
+        width: 1920,
+        height: 1080,
+        frame: false,
+        webPreferences: {
+            nodeIntegration: true
         }
-    }
-    fs.writeFileSync("data/manifest.json", JSON.stringify(newManifest))
-    manifest = newManifest
-    lock = manifest.nonce
-    await cleanImages()
-    console.log("Done processing manifest")
-    currentlyProcessing = 0
-    totalProcessing = 0
-}
-
-srv_app.get('/manifest', (req, res) => {
-    res.send({"nonce": manifest.nonce})
-});
-
-srv_app.get("/status", async (req, res) => {
-    if (req.query.auth == auth) {
-        saveNewIP(req.connection.localAddress)
-        res.send({
-            "error": false,
-            "nonce": manifest.nonce,
-            "image": lastImage,
-            "warns": await getWarnings()
-        })
-    } else {
-        console.log("Auth failed for status update")
-        res.send({error: "auth"})
-    }
-});
-
-srv_app.post("/manifest", async (req, res) => {
-    if (req.body.auth == auth) {
-        console.log("Loading new manifest");
-        saveNewIP(req.connection.localAddress)
-        await processManifest(req.body);
-        res.send({error: false})
-    } else {
-        console.log("Auth failed for manifest update")
-        res.send({error: "auth"})
-    }
-});
-
-srv_app.post("/reboot", (req, res) => {
-    if (req.body.auth == auth) {
-        saveNewIP(req.connection.localAddress)
-        res.send({error: false})
-        exec('shutdown -r now', function(error, stdout, stderr){ res.send({error: false}) });
-    } else {
-        console.log("Auth failed for reboot request")
-        res.send({error: "auth"})
-    }
-});
-
-function createWindow () {
-    let win = new BrowserWindow({
-      width: 1920,
-      height: 1080,
-      frame: false,
-      webPreferences: {
-        nodeIntegration: true
-      }
     })
 
     win.loadFile('static/index.html')
 }
 
-function getFileContent(path) {
-    return new Promise((resolve) => {
-        fs.readFile(path, "utf-8", (err, cont) => {
-            resolve(cont)
-        });
-    });
-}
+// setup
+const { v4: uuidv4 } = require('uuid');
 
-async function ipChangeDetection() {
-    let ret = true
-    if (await exists('data/connect_ip')) {
-        let ip = await getFileContent('data/connect_ip')
-        for (let interface of getInterfaces()) {
-            if (interface.address == ip.trim()) ret = false
-        }
-        return ret
-    } else return true
-}
-
-function saveNewIP(ip) {
-    ip = ip.replace("::ffff:", "")
-    fs.writeFile("data/connect_ip", ip, async (err) => {
-        if (err) console.log(err)
-    });
-}
-
-async function getWarnings() {
-    let warnings = []
-    if (manifest.nonce == 0) warnings.push("NOMANIFEST")
-    if (auth == "") warnings.push("NOPASSWORD")
-    if (currentlyProcessing != 0) warnings.push("CPROC")
-    if (manifest.data.length == 0 && NOSLIDE_WARNING) warnings.push("NOSLIDE")
-    if (await ipChangeDetection() && manifest.nonce != 0) warnings.push("IPERROR")
-    return warnings
-}
-
-ipcMain.handle('ping', (event, arg) => {
-    return {"nonce": lock}
-})
-ipcMain.handle('manifest', (event, arg) => {
-    return manifest
-})
-ipcMain.handle('getImage', async (event, arg) => {
-    lastImage = arg
-    return await getFileContent(img_path + arg)
-})
-ipcMain.handle('warnings', (event, arg) => {
-    return getWarnings()
-})
-
-ipcMain.handle("currentlyProcessing", (event, arg) => {
-    return [currentlyProcessing, totalProcessing]
-})
-
-ipcMain.handle("interfaces", (event, arg) => {
-    return getInterfaces()
-});
-
-app.whenReady().then(createWindow).then(async () => {
-    srv_app.listen(3030)
-    try {
-        manifest = JSON.parse(fs.readFileSync("data/manifest.json"))
-    } catch(e) {
-        console.log("No manifest!")
-        manifest = {
-            "data": {},
-            "nonce": 0,
-            "id": null
-        }
-    }
-    lock = manifest.nonce
+async function initialize() {
+    await execute("rw")
     await fs.promises.mkdir('data/img', { recursive: true })
-    await checkForUpdate()
-});
+    await execute("ro")
+    let config = await readJSON("data/config.json")
 
-
-
-async function checkForUpdate() {
-    if (manifest.id != null) {
-        let serverNonce = await get(`http://${manifest.address}:${manifest.port}/api/device/getnonce/${manifest.id}`)
-        if (JSON.parse(serverNonce).nonce != manifest.nonce) {
-            get(`http://${manifest.address}:${manifest.port}/api/device/refresh/${manifest.id}`);
-            console.log("Refreshing manifest");
-        } else {
-            console.log("Manifest up to date");
-        }
-    } else {
-        console.log("No manifest ID loaded, cannot refresh");
+    manifest = await readJSON("data/manifest.json")
+    if (!manifest) {
+        manifest = {}
+        await writeJSON("data/manifest.json", manifest, true);
     }
+
+    if (!config) {
+        let id = uuidv4()
+        config = {
+            "schema": 2,
+            "localID": id,
+            "keys": await getKeypair(id),
+            "server": null,
+            "serverKey": null,
+            "localIP": null
+        }
+
+        await writeJSON("data/config.json", config, true);
+    }
+
+    device = config
+    console.log(`Local ID ${device.localID}`)
+
+    app.whenReady().then(createWindow).then(async () => {
+
+    });
 }
 
+async function update(md) {
+    client.send("state", ["update", "Preparing..."])
+    let slideCount = md.slides.length
+    let current = 0
+    await execute("rw")
+    await fs.promises.rename("data/img", "data/img-old")
+    await fs.promises.mkdir("data/img")
+    for (let slide of md.slides) {
+        switch (slide.type) {
+            case "image":
+            case "video":
+                if (await exists(`data/img-old/${slide.hash}.${slide.extension}`)) {
+                    await fs.promises.rename(`data/img-old/${slide.hash}.${slide.extension}`, `data/img/${slide.hash}.${slide.extension}`)
+                } else {
+                    await pipeToLocation(`${device.server}/hash/${slide.hash}.${slide.extension}`, `data/img/${slide.hash}.${slide.extension}`)
+                }
+        }
+        current++
+        client.send("state", ["update", `${current}/${slideCount} loaded`])
+    }
+    manifest = md
+    await fs.promises.rmdir("data/img-old", {recursive: true})
+    await writeJSON("data/manifest.json", md);
+    await execute("ro")
+    win.reload()
+}
+
+async function runHealthCheck() {
+    let imageData = await new Promise(async (resolve) => {
+        await execute("scrot /tmp/img.png")
+        fs.readFile("/tmp/img.png", (err, data) => {
+            let base64Image = new Buffer(data, 'binary').toString('base64');
+            let imgSrcString = `data:image/png;base64,${base64Image}`;
+            resolve(imgSrcString)
+        });
+    })
+        return {
+            "manifest": manifest,
+            "screenshot": imageData
+        }
+}
+
+initialize()

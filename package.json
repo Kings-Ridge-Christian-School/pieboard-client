@@ -1,14 +1,14 @@
 {
   "name": "pieboard-client",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "electron --no-sandbox ."
+    "start": "electron ."
   },
   "repository": {
     "type": "git",
-    "url": "http://10.20.3.171/lholliger/pieboard-client"
+    "url": "https://github.com/kings-ridge-christian-school/pieboard-client"
   },
   "author": "Lukas Holliger",
   "license": "MIT",
@@ -17,10 +17,15 @@
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "glob": "^7.1.6",
+    "hls.js": "^1.0.7",
     "md5": "^2.2.1",
-    "node-fetch": "^2.6.0"
+    "node-fetch": "^2.6.0",
+    "openpgp": "^5.0.0-3",
+    "synergy": "^5.0.0",
+    "uuid": "^8.3.2",
+    "youtube-player": "^5.5.2"
   },
   "devDependencies": {
-    "electron": "^9.0.4"
+    "electron": "^9.4.4"
   }
 }
