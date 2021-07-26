@@ -69,8 +69,8 @@ const openpgp = require('openpgp')
 async function getKeypair(name) {
     let keys = await openpgp.generateKey({curve: "ed25519", userIDs: [{"name": name}]})
     return {
-        "private": keys.privateKeyArmored || keys.privateKey,
-        "public": keys.publicKeyArmored || keys.publicKey,
+        "private": keys.privateKey,
+        "public": keys.publicKey,
         "revocation": keys.revocationCertificate
     }
 }
@@ -100,7 +100,7 @@ async function decrypt(message, recvKey) {
         decryptionKeys: await openpgp.readKey({ armoredKey: device.keys.private })
     });
 
-    if (!out.signatures[0].signature.packets[0].verified) { // ignore date checks
+    if (!await out.signatures[0].verified) {
         console.log("Message wasnt signed, ignoring")
         return
     }
@@ -155,12 +155,13 @@ srv_app.post("/setup", async (req, res) => {
             res.send("auth")
             return
         }
+        console.log("A REGISTER")
         res.send(device.keys.public)
         setTimeout(async ()=> {
             let server_addr = req.body.server_address
 
             device.id = req.body.device_id
-
+            console.log("A SEND")
             let serverResponse = await sendServerCommand(server_addr, req.body.key, {"act":"register"})
 
             if (serverResponse) client.send("state", ["initialize"])
@@ -177,6 +178,7 @@ srv_app.post("/setup", async (req, res) => {
 })
 
 srv_app.post("/client", async (req, res) => {
+    console.log("A CLIENT")
     let action = await decrypt(req.body.msg, device.serverKey)
     device.localIP = req.socket.localAddress.replace(/^.*:/, '')
     await writeJSON("data/config.json", device, true)
