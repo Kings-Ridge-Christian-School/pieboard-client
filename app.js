@@ -69,8 +69,8 @@ const openpgp = require('openpgp')
 async function getKeypair(name) {
     let keys = await openpgp.generateKey({curve: "ed25519", userIDs: [{"name": name}]})
     return {
-        "private": keys.privateKeyArmored,
-        "public": keys.publicKeyArmored,
+        "private": keys.privateKeyArmored || keys.privateKey,
+        "public": keys.publicKeyArmored || keys.publicKey,
         "revocation": keys.revocationCertificate
     }
 }
