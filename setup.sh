@@ -74,6 +74,7 @@ xset s off
 xset -dpms
 xset s noblank
 rw
+xrandr --output HDMI-1 --mode 1920x1080
 sudo service ntp stop
 sudo ntpdate -s time.nist.gov
 sudo service ntp start

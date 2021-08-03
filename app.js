@@ -155,13 +155,11 @@ srv_app.post("/setup", async (req, res) => {
             res.send("auth")
             return
         }
-        console.log("A REGISTER")
         res.send(device.keys.public)
         setTimeout(async ()=> {
             let server_addr = req.body.server_address
 
             device.id = req.body.device_id
-            console.log("A SEND")
             let serverResponse = await sendServerCommand(server_addr, req.body.key, {"act":"register"})
 
             if (serverResponse) client.send("state", ["initialize"])
@@ -178,7 +176,6 @@ srv_app.post("/setup", async (req, res) => {
 })
 
 srv_app.post("/client", async (req, res) => {
-    console.log("A CLIENT")
     let action = await decrypt(req.body.msg, device.serverKey)
     device.localIP = req.socket.localAddress.replace(/^.*:/, '')
     await writeJSON("data/config.json", device, true)
@@ -214,6 +211,7 @@ srv_app.post("/client", async (req, res) => {
                     console.log("Running npm install")
                     await execute("npm i")
                     console.log("Running post-update script")
+                    await execute("chmod +x post-update.sh")
                     await execute("./post-update.sh") // this will only be needed in some instances
                     console.log("rebooting...")
                     setTimeout(() => {
@@ -240,6 +238,10 @@ srv_app.post("/client", async (req, res) => {
             break;
     }
     // work on this
+});
+
+srv_app.get("/ping", (req, res) => {
+   res.send("OK")
 });
 
 srv_app.listen(44172, () => {

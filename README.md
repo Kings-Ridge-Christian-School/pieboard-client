@@ -1,6 +1,6 @@
 # PieBoard Client
 
-To create a PieBoard:
+### To create a PieBoard
 1. Download Raspberry Pi OS Lite from the [Raspberry Pi Website](https://www.raspberrypi.org/software/operating-systems/)
 2. Write the image to a micro SD card, documentation for different operating systems can be found on the [Raspberry Pi Website](https://www.raspberrypi.org/documentation/installation/installing-images/)
 3. Insert the SD card into your Raspberry Pi, it is recommended you also install a case and cooler on the Pi
