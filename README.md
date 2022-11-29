@@ -6,6 +6,7 @@
 3. Insert the SD card into your Raspberry Pi, it is recommended you also install a case and cooler on the Pi
 4. Connect the Pi to the internet, whether that be over ethernet or [Wi-Fi](https://www.raspberrypi.org/documentation/configuration/wireless/wireless-cli.md)
 5. Download the [setup.sh](https://raw.githubusercontent.com/Kings-Ridge-Christian-School/pieboard-client/master/setup.sh) file provided in this repository. (wget recommended, do NOT clone the repository)
+    * `wget https://go.kingsridgecs.org/digsig --output-document=setup.sh`
 6. make the file executable, `chmod +x setup.sh`
 7. run the file, `./setup.sh`
 8. the default password is `raspberry`, this will prompt you to change it
